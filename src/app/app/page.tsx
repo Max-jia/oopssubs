@@ -470,10 +470,10 @@ export default function AppPage() {
           setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(token);
           if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); setScanStatus(""); return; }
-          setScanStatus(`Found ${messages.length} emails, reading...`);
+          setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
-          for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
-          setScanStatus(`Analyzing ${bodies.length} emails with AI...`);
+          for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
+          setScanStatus(`AI analyzing ${bodies.length} emails...`);
           const extracted = dedupeSubs(await extractSubsWithAI(bodies));
           if (extracted.length === 0) {
             setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually or check if your subscription emails are in a different folder.`);
@@ -493,10 +493,10 @@ export default function AppPage() {
             setScanning(false);
             return;
           }
-          setScanStatus(`Found ${messages.length} emails, reading...`);
+          setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
-          for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
-          setScanStatus(`Analyzing ${bodies.length} emails with AI...`);
+          for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
+          setScanStatus(`AI analyzing ${bodies.length} emails...`);
           const extracted = dedupeSubs(await extractSubsWithAI(bodies));
           if (extracted.length === 0) {
             setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually.`);
