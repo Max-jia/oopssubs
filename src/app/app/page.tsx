@@ -19,6 +19,8 @@ interface ScannedSub {
   amount: number;
   cycle: "monthly" | "yearly";
   confidence: "high" | "low";
+  isTrial?: boolean;
+  trialEnd?: string; // YYYY-MM-DD
 }
 
 /* ── Helpers ── */
@@ -128,7 +130,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-async function getEmailBody(token: string, msgId: string): Promise<string> {
+async function getEmailBody(token: string, msgId: string): Promise<{ text: string; trialEnd: string }> {
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}?format=full`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -159,8 +161,19 @@ async function getEmailBody(token: string, msgId: string): Promise<string> {
   }
 
   const textBody = plainText || stripHtml(htmlBody);
+  // Detect trial period
+  const trialMatch = textBody.match(/free\s*(?:trial|period).*?(\d+).*?(day|week|month)s?/i)
+    || textBody.match(/trial\s*(?:ends?|expires?|until)\s*([A-Z][a-z]+ \d{1,2},? \d{4}|\d{1,2}\/[A-Z][a-z]+\/\d{4})/i);
+  let trialEnd = "";
+  if (trialMatch) {
+    try {
+      const d = new Date(trialMatch[1]);
+      if (!isNaN(d.getTime())) trialEnd = d.toISOString().slice(0, 10);
+    } catch {}
+  }
+
   const clean = textBody.replace(/\s+/g, " ").trim().slice(0, 2500);
-  return `From: ${sender}\nSubject: ${subject}\nBody: ${clean}`;
+  return { text: `From: ${sender}\nSubject: ${subject}\nBody: ${clean}`, trialEnd };
 }
 
 /* ── Step 3: Simple regex fallback for common patterns ── */
@@ -191,37 +204,51 @@ function quickRegexExtract(text: string): ScannedSub | null {
 }
 
 /* ── Step 4: AI extraction (improved prompt) ── */
-async function extractSubsWithAI(bodies: string[]): Promise<ScannedSub[]> {
+async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): Promise<ScannedSub[]> {
   // Quick regex pre-scan — catch obvious ones instantly
   const quickResults: ScannedSub[] = [];
-  const remaining: string[] = [];
+  const remaining: { text: string; trialEnd: string }[] = [];
   for (const body of bodies) {
-    const q = quickRegexExtract(body);
-    if (q) quickResults.push(q);
-    else remaining.push(body);
+    const q = quickRegexExtract(body.text);
+    if (q) {
+      if (body.trialEnd) { q.isTrial = true; q.trialEnd = body.trialEnd; q.confidence = "medium"; }
+      quickResults.push(q);
+    } else {
+      remaining.push(body);
+    }
   }
   if (remaining.length === 0) {
     return quickResults;
   }
 
-  const prompt = `You are analyzing emails to find recurring paid subscriptions.
+  const prompt = `You are analyzing emails to find subscriptions the user needs to manage.
 
-Extract ONLY services the user is actively paying for. Skip: free trials (unless already charged), one-time purchases, shipping/delivery confirmations, password resets, account verification emails.
+Include BOTH:
+1. Active paid subscriptions (user is currently being charged)
+2. Free trials that will auto-renew and charge later — these are critical, the user needs to cancel before being charged
 
-For each subscription found, return: name (clean service name, not company legal name), amount (number, in USD), cycle ("monthly" or "yearly"), confidence ("high" if exact amount+service clearly stated, "low" if unclear).
+Skip ONLY: one-time purchases (no auto-renewal), shipping confirmations, password resets, account verification emails.
+
+For each subscription found, return:
+- name: clean service name (e.g. "Netflix" not "Netflix, Inc.")
+- amount: number in USD. For trials, use the amount they'll be charged AFTER the trial ends (e.g. $15.99). If trial amount is unknown, use 0.
+- cycle: "monthly" or "yearly"
+- confidence: "high" if exact amount and service clearly stated, "low" if unclear
+- isTrial: true ONLY if this is currently a free trial (has not been charged yet). false if already paying.
+- trialEnd: if isTrial, the date the trial ends in YYYY-MM-DD format. Empty string if unknown or not a trial.
 
 IMPORTANT:
-- If an email says "$0.00" or "free" or "trial" — SKIP IT
-- If the same service appears in multiple emails, only return it ONCE with the most recent amount
-- Annual charges like "$139.00/year" should have cycle="yearly", amount=139
-- Bundled charges (e.g., "Apple services $32.95" including iCloud+Music+TV) should be listed as ONE subscription with the bundle name
-- Look for: "your subscription", "renewal", "monthly charge", "annual membership", "auto-payment", "we charged", "thank you for your payment", "billing statement"
+- FREE TRIALS ARE CRITICAL — include them. Mark isTrial=true. These are subscriptions the user will forget about
+- If the same service appears in multiple emails, return it ONCE with the most recent information
+- Annual charges like "$139.00/year" → cycle="yearly", amount=139
+- Bundled charges (e.g., "Apple services $32.95") → ONE subscription with the bundle name
+- Look for: "subscription", "renewal", "monthly charge", "membership", "auto-payment", "we charged", "thank you for your payment", "billing statement", "free trial", "trial ends", "trial period", "start your free", "cancel before"
 
-Respond with ONLY valid JSON, nothing else:
-[{"name":"Netflix","amount":15.99,"cycle":"monthly","confidence":"high"}]
+Respond with ONLY valid JSON:
+[{"name":"Netflix","amount":15.99,"cycle":"monthly","confidence":"high","isTrial":false,"trialEnd":""},{"name":"Hulu","amount":7.99,"cycle":"monthly","confidence":"high","isTrial":true,"trialEnd":"2026-07-30"}]
 
 Emails:
-${remaining.join("\n\n===NEXT EMAIL===\n\n")}`;
+${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
 
   try {
     const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
@@ -363,8 +390,8 @@ export default function AppPage() {
           localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
           const messages = await searchSubscriptionEmails(token);
           if (messages.length === 0) { setScannedItems([]); setError("No subscription emails found. Try adding manually."); setScanning(false); return; }
-          const bodies: string[] = [];
-          for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body) bodies.push(body); }
+          const bodies: { text: string; trialEnd: string }[] = [];
+          for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
           const extracted = await extractSubsWithAI(bodies);
           setScannedItems(dedupeSubs(extracted)); setScanning(false);
         },
@@ -387,9 +414,12 @@ export default function AppPage() {
   }, []);
 
   const confirmScanned = useCallback((item: ScannedSub, idx: number) => {
+    const nextDate = item.trialEnd
+      ? item.trialEnd
+      : new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
     const sub: Subscription = {
       id: uuid(), name: item.name, amount: item.amount, cycle: item.cycle,
-      nextDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
+      nextDate,
       createdAt: new Date().toISOString(),
     };
     const updated = [...subs, sub]; setSubs(updated); saveSubs(updated);
@@ -467,12 +497,27 @@ export default function AppPage() {
             <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em] mb-3">Found in your inbox</h2>
             <div className="space-y-2 stagger-item">
               {scannedItems.map((item, i) => (
-                <div key={i} className="card flex items-center justify-between py-4 px-5">
+                <div key={i} className={`card flex items-center justify-between py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}>
                   <div>
-                    <div className="text-[15px] font-semibold">{item.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-[15px] font-semibold">{item.name}</div>
+                      {item.isTrial && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fff3e0] text-[#e65100]">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Free trial
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[13px] text-[#86868b]">
-                      {item.amount > 0 ? fmtCurrency(item.amount) + '/' + item.cycle : 'Amount unknown'}
-                      {item.confidence === 'low' && (
+                      {item.isTrial ? (
+                        <>
+                          {item.amount > 0 ? `${fmtCurrency(item.amount)}/${item.cycle} after trial` : 'Amount unknown'}
+                          {item.trialEnd && <span className="ml-1">· Ends {new Date(item.trialEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                        </>
+                      ) : (
+                        <>{item.amount > 0 ? fmtCurrency(item.amount) + '/' + item.cycle : 'Amount unknown'}</>
+                      )}
+                      {item.confidence === 'low' && !item.isTrial && (
                         <span className="inline-flex items-center gap-1 ml-2 text-[#e65100]">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                           Low confidence
@@ -480,9 +525,9 @@ export default function AppPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button onClick={() => dismissScanned(i)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
-                    <button onClick={() => confirmScanned(item, i)} className="bg-[#1d1d1f] hover:bg-[#3a3a3c] active:scale-95 transition-all duration-150 text-white text-[14px] font-medium px-4 py-2 rounded-full">Add</button>
+                    <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-white text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[#e65100] hover:bg-[#bf360c]' : 'bg-[#1d1d1f] hover:bg-[#3a3a3c]'}`}>Add</button>
                   </div>
                 </div>
               ))}
