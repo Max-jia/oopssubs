@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Script from "next/script";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ── Types ── */
 interface Subscription {
@@ -654,9 +655,15 @@ export default function AppPage() {
         {/* Total */}
         <div className="text-center mb-10">
           <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.05em] mb-2">Monthly spend</p>
-          <p className="text-[48px] font-extrabold tracking-[-0.03em] counter animate-scale-in">
+          <motion.p
+            className="text-[48px] font-extrabold tracking-[-0.03em]"
+            key={monthTotal.toFixed(2)}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          >
             {fmtCurrency(monthTotal)}
-          </p>
+          </motion.p>
           {subs.length > 0 && (
             <p className="text-[14px] text-[#86868b] mt-1 animate-slide-down">{subs.length} subscription{subs.length > 1 ? 's' : ''}</p>
           )}
@@ -715,7 +722,13 @@ export default function AppPage() {
             <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em] mb-3">Found in your inbox</h2>
             <div className="space-y-2 stagger-item">
               {scannedItems.map((item, i) => (
-                <div key={i} className={`card flex items-center justify-between py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}>
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: i * 0.08, type: "spring", stiffness: 400, damping: 22 }}
+                  className={`card flex items-center justify-between py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}
+                >
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="text-[15px] font-semibold">{item.name}</div>
@@ -750,7 +763,7 @@ export default function AppPage() {
                     <button onClick={() => dismissScanned(i)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
                     <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-white text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[#e65100] hover:bg-[#bf360c]' : 'bg-[#1d1d1f] hover:bg-[#3a3a3c]'}`}>Add</button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -765,43 +778,69 @@ export default function AppPage() {
             </div>
             <div className="card p-0 overflow-hidden">
               {subs.sort((a, b) => daysUntil(a.nextDate) - daysUntil(b.nextDate)).map((sub, i) => (
-                <div key={sub.id} className={i !== subs.length - 1 ? 'border-b border-[#e5e5ea]' : ''}>
+                <motion.div
+                  key={sub.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 25 }}
+                  exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+                  className={i !== subs.length - 1 ? 'border-b border-[#e5e5ea]' : ''}
+                >
                   <SubscriptionRow sub={sub} onDelete={() => deleteSub(sub.id)} />
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         )}
 
         {/* Add modal */}
-        {showAdd && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
-            <div className="sheet-backdrop" onClick={() => setShowAdd(false)} />
-            <div className="sheet-content" onClick={(e) => e.stopPropagation()}>
-              <div className="w-8 h-1 rounded-full bg-[#d2d2d7] mx-auto mb-5" />
-              <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-5">New subscription</h3>
-              <div className="space-y-3">
-                <input className="input-apple" placeholder="Service name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-4 top-[14px] text-[15px] text-[#aeaeb2] font-medium">$</span>
-                    <input className="input-apple pl-8" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+        <AnimatePresence>
+          {showAdd && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center">
+              <motion.div
+                className="sheet-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowAdd(false)}
+              />
+              <motion.div
+                className="sheet-content"
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                drag="y"
+                dragConstraints={{ top: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(_, info) => { if (info.velocity.y > 500 || info.offset.y > 150) setShowAdd(false); }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-8 h-1 rounded-full bg-[#d2d2d7] mx-auto mb-5" />
+                <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-5">New subscription</h3>
+                <div className="space-y-3">
+                  <input className="input-apple" placeholder="Service name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-4 top-[14px] text-[15px] text-[#aeaeb2] font-medium">$</span>
+                      <input className="input-apple pl-8" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+                    </div>
+                    <select className="select-apple w-auto" value={form.cycle} onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as any }))}>
+                      <option value="monthly">/mo</option>
+                      <option value="yearly">/yr</option>
+                      <option value="quarterly">/qtr</option>
+                    </select>
                   </div>
-                  <select className="select-apple w-auto" value={form.cycle} onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as any }))}>
-                    <option value="monthly">/mo</option>
-                    <option value="yearly">/yr</option>
-                    <option value="quarterly">/qtr</option>
-                  </select>
+                  <input className="input-apple" type="date" value={form.nextDate} onChange={(e) => setForm((f) => ({ ...f, nextDate: e.target.value }))} />
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Cancel</button>
+                    <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount}>Add</button>
+                  </div>
                 </div>
-                <input className="input-apple" type="date" value={form.nextDate} onChange={(e) => setForm((f) => ({ ...f, nextDate: e.target.value }))} />
-                <div className="flex gap-2 pt-2">
-                  <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Cancel</button>
-                  <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount}>Add</button>
-                </div>
-              </div>
+              </motion.div>
             </div>
-          </div>
-        )}
+          )}
+        </AnimatePresence>
       </main>
     </>
   );
