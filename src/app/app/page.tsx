@@ -87,17 +87,27 @@ async function initGapiClient(token: string) {
   (window as any).gapi.client.setToken({ access_token: token });
 }
 
-/* ── Step 1: Multi-angle search for maximum coverage ── */
+/* ── Step 1: Multi-language + multi-angle coverage ── */
 const SUB_SEARCH_QUERIES = [
-  // 1. Direct subscription keywords (title + body, Gmail q= searches both)
-  '"subscription" OR "membership" OR "auto-renew" OR "recurring payment" newer_than:2y',
-  // 2. Billing/receipt language — catches most subscription charge emails
-  '("receipt" OR "invoice" OR "we charged" OR "has been charged" OR "payment confirmed" OR "thank you for your" OR "billing statement") newer_than:2y',
-  // 3. Renewal/plan language
-  '("your plan" OR "renewal" OR "renews on" OR "will renew" OR "monthly charge" OR "annual fee" OR "your next bill") newer_than:2y',
-  // 4. Free trial language — critical! These are future charges
+  // English — billing + subscription + renewal
+  '("receipt" OR "invoice" OR "we charged" OR "payment confirmed" OR "subscription" OR "membership" OR "auto-renew" OR "recurring payment" OR "your plan" OR "renewal" OR "monthly charge" OR "annual fee") newer_than:2y',
+  // English — free trial
   '("free trial" OR "trial ends" OR "start your free" OR "cancel before" OR "trial period" OR "try it free") newer_than:2y',
-  // 5. Common billing sender patterns
+  // 中文 (简/繁) — 付款/订阅/续费/会员
+  '("付款" OR "账单" OR "扣款" OR "订阅" OR "续费" OR "会员" OR "自动续费" OR "免費試用" OR "免费试用" OR "訂閱") newer_than:2y',
+  // 日本語 — 支払い/サブスク/会員/自動更新
+  '("支払い" OR "請求" OR "サブスクリプション" OR "会員" OR "自動更新" OR "定期購読" OR "無料トライアル" OR "更新" OR "決済") newer_than:2y',
+  // 한국어 — 결제/구독/멤버십/자동갱신
+  '("결제" OR "청구" OR "구독" OR "멤버십" OR "자동 갱신" OR "정기 결제" OR "무료 체험" OR "갱신") newer_than:2y',
+  // Español — suscripción/factura/renovación
+  '("suscripción" OR "factura" OR "membresía" OR "renovación" OR "cobro" OR "pago" OR "prueba gratuita" OR "cuota") newer_than:2y',
+  // Français — abonnement/facture/renouvellement
+  '("abonnement" OR "facture" OR "paiement" OR "renouvellement" OR "prélèvement" OR "essai gratuit" OR "souscription" OR "forfait") newer_than:2y',
+  // Deutsch — Abonnement/Rechnung/Verlängerung
+  '("Abonnement" OR "Rechnung" OR "Zahlung" OR "Mitgliedschaft" OR "Verlängerung" OR "Abbuchung" OR "kostenlose Testversion" OR "Beitrag") newer_than:2y',
+  // Português — assinatura/fatura/renovação
+  '("assinatura" OR "fatura" OR "pagamento" OR "renovação" OR "cobrança" OR "teste grátis" OR "plano" OR "mensalidade") newer_than:2y',
+  // Common billing senders (all languages)
   'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR no-reply@ OR donotreply@) newer_than:2y',
 ];
 
@@ -232,7 +242,7 @@ async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): 
     return quickResults;
   }
 
-  const prompt = `You are analyzing emails to find subscriptions the user needs to manage.
+  const prompt = `You are analyzing emails in multiple languages (English, Chinese, Japanese, Korean, Spanish, French, German, Portuguese, etc.) to find subscriptions the user needs to manage.
 
 Include BOTH:
 1. Active paid subscriptions (user is currently being charged)
