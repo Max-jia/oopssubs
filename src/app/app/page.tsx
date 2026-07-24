@@ -51,7 +51,10 @@ function daysUntil(dateStr: string): number {
 }
 
 /* ── Gmail helpers ── */
-const GMAIL_SCOPES = "https://www.googleapis.com/auth/gmail.readonly";
+const GMAIL_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
+].join(" ");
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 function getStoredToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
@@ -303,12 +306,36 @@ function generateICS(sub: Subscription): string {
   ].join("\r\n");
 }
 
-function addToCalendar(sub: Subscription) {
+async function addToCalendar(sub: Subscription) {
+  const token = getStoredToken();
+  if (token) {
+    // Try direct Google Calendar API first —
+    const d = new Date(sub.nextDate + "T10:00:00");
+    const end = new Date(d.getTime() + 3600000);
+    try {
+      const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: `Cancel ${sub.name}?`,
+          description: `${sub.name} · ${fmtCurrency(sub.amount)}/${sub.cycle}\n\nAdded by OopsSubs`,
+          start: { dateTime: d.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          end: { dateTime: end.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          reminders: {
+            useDefault: false,
+            overrides: [{ method: "popup", minutes: 3 * 24 * 60 }, { method: "popup", minutes: 24 * 60 }],
+          },
+        }),
+      });
+      if (res.ok) {
+        return; // Success — event created directly, no download
+      }
+    } catch {}
+  }
+  // Fallback: download ICS file
   const ics = generateICS(sub);
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-
-  // Try to open native calendar app via data URI
   const a = document.createElement("a");
   a.href = url;
   a.download = `oopssubs-${sub.name.toLowerCase().replace(/\s+/g, "-")}.ics`;
