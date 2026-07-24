@@ -55,10 +55,12 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 function getStoredToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
 
 async function gapiInit(): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if ((window as any).gapiInited) { resolve(); return; }
+    const gapi = (window as any).gapi;
+    if (!gapi) { reject(new Error("Google API not loaded yet. Try again.")); return; }
     (window as any).gapiInited = true;
-    (window as any).gapi.load("client", { callback: resolve });
+    gapi.load("client", { callback: resolve });
   });
 }
 
@@ -80,14 +82,50 @@ async function initGapiClient(token: string) {
   (window as any).gapi.client.setToken({ access_token: token });
 }
 
+/* ── Step 1: Search with multiple queries for better coverage ── */
+const SUB_SEARCH_QUERIES = [
+  'subject:(receipt OR invoice OR "your" OR "renewal" OR "billed" OR "payment" OR "subscription" OR "membership" OR "monthly" OR "annual")',
+  'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR support@ OR info@ OR hello@ OR team@) newer_than:2y',
+];
+
 async function searchSubscriptionEmails(token: string): Promise<any[]> {
-  const query = "subject:(receipt OR invoice OR subscription OR \"your plan\" OR renewed OR billing) newer_than:2y";
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=30`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const data = await res.json();
-  return data.messages || [];
+  const allMessages: any[] = [];
+  const seen = new Set<string>();
+  for (const query of SUB_SEARCH_QUERIES) {
+    try {
+      const res = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=25`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      for (const msg of data.messages || []) {
+        if (!seen.has(msg.id)) { seen.add(msg.id); allMessages.push(msg); }
+      }
+    } catch {}
+  }
+  return allMessages.slice(0, 40);
+}
+
+/* ── Step 2: Better email body extraction — try plain text first, fallback to HTML ── */
+function decodeBase64Url(data: string): string {
+  try { return atob(data.replace(/-/g, "+").replace(/_/g, "/")); }
+  catch { return ""; }
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function getEmailBody(token: string, msgId: string): Promise<string> {
@@ -96,41 +134,122 @@ async function getEmailBody(token: string, msgId: string): Promise<string> {
     { headers: { Authorization: `Bearer ${token}` } }
   );
   const data = await res.json();
+  const headers = data.payload?.headers || [];
+  const sender = headers.find((h: any) => h.name === "From")?.value || "";
+  const subject = headers.find((h: any) => h.name === "Subject")?.value || "";
+
   const parts = data.payload?.parts || [data.payload];
-  let body = "";
+  let plainText = "";
+  let htmlBody = "";
+
   for (const p of parts) {
-    if (p.mimeType === "text/plain" && p.body?.data) {
-      body += atob(p.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+    const bodyData = p.body?.data;
+    if (!bodyData) continue;
+    if (p.mimeType === "text/plain") plainText += decodeBase64Url(bodyData);
+    else if (p.mimeType === "text/html") htmlBody += decodeBase64Url(bodyData);
+    // Recurse into nested multipart
+    if (p.parts) {
+      for (const np of p.parts) {
+        const nd = np.body?.data;
+        if (!nd) continue;
+        if (np.mimeType === "text/plain") plainText += decodeBase64Url(nd);
+        else if (np.mimeType === "text/html") htmlBody += decodeBase64Url(nd);
+      }
     }
   }
-  return body.slice(0, 3000);
+
+  const textBody = plainText || stripHtml(htmlBody);
+  const clean = textBody.replace(/\s+/g, " ").trim().slice(0, 2500);
+  return `From: ${sender}\nSubject: ${subject}\nBody: ${clean}`;
 }
 
+/* ── Step 3: Simple regex fallback for common patterns ── */
+function quickRegexExtract(text: string): ScannedSub | null {
+  // Netflix
+  const netflix = text.match(/Netflix.*?\$?(\d+\.?\d*)/i);
+  if (netflix) return { name: "Netflix", amount: parseFloat(netflix[1]), cycle: "monthly", confidence: "high" };
+  // Spotify
+  const spotify = text.match(/Spotify.*?\$?(\d+\.?\d*)/i);
+  if (spotify) return { name: "Spotify", amount: parseFloat(spotify[1]), cycle: "monthly", confidence: "high" };
+  // Hulu
+  const hulu = text.match(/Hulu.*?\$?(\d+\.?\d*) or (\d+\.?\d*)\/mo/i);
+  if (hulu) {
+    const amt = parseFloat(hulu[1] || hulu[2]);
+    if (amt > 0) return { name: "Hulu", amount: amt, cycle: "monthly", confidence: "high" };
+  }
+  // Amazon Prime - detect membership fee
+  const prime = text.match(/Prime.*?membership.*?\$?(\d+\.?\d*)/i);
+  if (prime) return { name: "Amazon Prime", amount: parseFloat(prime[1]), cycle: "yearly", confidence: "medium" };
+  // Generic: look for "$XX.XX/month" pattern
+  const generic = text.match(/(\d+\.?\d*)\s*\/\s*(month|mo|year|yr)/i);
+  if (generic) {
+    const amt = parseFloat(generic[1]);
+    const cycle = generic[2].startsWith("y") ? "yearly" : "monthly";
+    if (amt >= 0.99 && amt <= 999) return { name: "Subscription", amount: amt, cycle: cycle as "monthly"|"yearly", confidence: "low" };
+  }
+  return null;
+}
+
+/* ── Step 4: AI extraction (improved prompt) ── */
 async function extractSubsWithAI(bodies: string[]): Promise<ScannedSub[]> {
-  const prompt = `You're a subscription detector. From the email bodies below, extract all subscription services the user is paying for. For each, return: service name, amount (number), cycle (monthly/yearly), confidence (high/low).
+  // Quick regex pre-scan — catch obvious ones instantly
+  const quickResults: ScannedSub[] = [];
+  const remaining: string[] = [];
+  for (const body of bodies) {
+    const q = quickRegexExtract(body);
+    if (q) quickResults.push(q);
+    else remaining.push(body);
+  }
+  if (remaining.length === 0) {
+    return quickResults;
+  }
 
-Rules:
-- Look for recurring charges, not one-time purchases
-- Ignore shipping confirmations, password resets, welcome emails without billing info
-- If you see "free trial", the user is likely NOT paying yet — skip unless there's a charge amount
-- Prefer exact dollar amounts from the email. If no amount found, mark confidence as "low"
-- Common subscriptions: streaming (Netflix, Spotify, Hulu, Disney+, HBO, YouTube Premium, Apple Music, Peacock, Paramount+), software (Adobe, Notion, Dropbox, Google One, iCloud, Microsoft 365), memberships (Amazon Prime, Walmart+, Instacart, DoorDash), dating (Tinder, Bumble, Hinge), news (NYT, WSJ, WaPo, Substack), fitness (Planet Fitness, Peloton, ClassPass), gaming (Xbox, PlayStation Plus, Nintendo Online)
+  const prompt = `You are analyzing emails to find recurring paid subscriptions.
 
-Respond with ONLY valid JSON:
-[{"name":"Netflix","amount":15.99,"cycle":"monthly","confidence":"high"},...]
+Extract ONLY services the user is actively paying for. Skip: free trials (unless already charged), one-time purchases, shipping/delivery confirmations, password resets, account verification emails.
 
-Email bodies:
-${bodies.join("\n---EMAIL---\n")}`;
+For each subscription found, return: name (clean service name, not company legal name), amount (number, in USD), cycle ("monthly" or "yearly"), confidence ("high" if exact amount+service clearly stated, "low" if unclear).
 
-  const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_KEY}` },
-    body: JSON.stringify({ model: "deepseek-v4-flash", messages: [{ role: "user", content: prompt }], temperature: 0, max_tokens: 2000 }),
-  });
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "[]";
-  try { return JSON.parse(text.replace(/```json|```/g, "").trim()); }
-  catch { return []; }
+IMPORTANT:
+- If an email says "$0.00" or "free" or "trial" — SKIP IT
+- If the same service appears in multiple emails, only return it ONCE with the most recent amount
+- Annual charges like "$139.00/year" should have cycle="yearly", amount=139
+- Bundled charges (e.g., "Apple services $32.95" including iCloud+Music+TV) should be listed as ONE subscription with the bundle name
+- Look for: "your subscription", "renewal", "monthly charge", "annual membership", "auto-payment", "we charged", "thank you for your payment", "billing statement"
+
+Respond with ONLY valid JSON, nothing else:
+[{"name":"Netflix","amount":15.99,"cycle":"monthly","confidence":"high"}]
+
+Emails:
+${remaining.join("\n\n===NEXT EMAIL===\n\n")}`;
+
+  try {
+    const res = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEEPSEEK_KEY}` },
+      body: JSON.stringify({ model: "deepseek-v4-flash", messages: [{ role: "user", content: prompt }], temperature: 0, max_tokens: 3000 }),
+    });
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || "[]";
+    const cleaned = text.replace(/```(?:json)?\s*|\s*```/g, "").trim();
+    const aiResults: ScannedSub[] = JSON.parse(cleaned);
+    return [...quickResults, ...aiResults];
+  } catch {
+    return quickResults;
+  }
+}
+
+/* ── Step 5: Deduplicate final results ── */
+function dedupeSubs(items: ScannedSub[]): ScannedSub[] {
+  const map = new Map<string, ScannedSub>();
+  for (const item of items) {
+    const key = item.name.toLowerCase().replace(/\s+/g, "");
+    const existing = map.get(key);
+    if (!existing || (item.confidence === "high" && existing.confidence !== "high")) {
+      map.set(key, item);
+    }
+  }
+  return [...map.values()];
 }
 
 /* ── Subscription Row ── */
@@ -167,8 +286,17 @@ export default function AppPage() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", amount: "", cycle: "monthly" as const, nextDate: "" });
   const [mounted, setMounted] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
 
   useEffect(() => { setSubs(loadSubs()); setMounted(true); }, []);
+
+  // Wait for Google API scripts to fully load
+  useEffect(() => {
+    const check = setInterval(() => {
+      if ((window as any).gapi) { setGoogleReady(true); clearInterval(check); }
+    }, 200);
+    return () => clearInterval(check);
+  }, []);
 
   // Auto-trigger action from URL params (wait for GAPI to load first)
   useEffect(() => {
@@ -238,7 +366,7 @@ export default function AppPage() {
           const bodies: string[] = [];
           for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body) bodies.push(body); }
           const extracted = await extractSubsWithAI(bodies);
-          setScannedItems(extracted); setScanning(false);
+          setScannedItems(dedupeSubs(extracted)); setScanning(false);
         },
       });
       const stored = getStoredToken();
@@ -249,7 +377,7 @@ export default function AppPage() {
           if (messages.length > 0) {
             const bodies: string[] = [];
             for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(stored, msg.id); if (body) bodies.push(body); }
-            setScannedItems(await extractSubsWithAI(bodies)); setScanning(false);
+            setScannedItems(dedupeSubs(await extractSubsWithAI(bodies))); setScanning(false);
             return;
           }
         } catch {}
@@ -306,11 +434,11 @@ export default function AppPage() {
 
         {/* Gmail scan — empty state */}
         {subs.length === 0 && scannedItems.length === 0 && !scanning && (
-          <button onClick={handleGmailScan} className="btn-primary w-full text-[17px] font-semibold py-4 mb-4">
+          <button onClick={handleGmailScan} disabled={!googleReady} className="btn-primary w-full text-[17px] font-semibold py-4 mb-4">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
-            Connect Gmail to find subscriptions
+            {googleReady ? "Connect Gmail to find subscriptions" : "Loading…"}
           </button>
         )}
 
