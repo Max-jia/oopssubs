@@ -562,17 +562,19 @@ export default function AppPage() {
 
   const handleGmailScan = useCallback(async () => {
     setScanning(true); setError(""); setScanStatus(""); setScannedItems([]);
+    // Safety timeout: if scan takes >45s, show error
+    const timeout = setTimeout(() => { setError("Scan is taking too long. Check your connection and try again."); setScanning(false); }, 45000);
     try {
       await gapiInit(); const oauth2 = await gisInit();
       const tokenClient = oauth2.initTokenClient({
         client_id: CLIENT_ID, scope: GMAIL_SCOPES,
         callback: async (resp: any) => {
-          if (resp.error) { setError("Gmail access denied."); setScanning(false); setScanStatus(""); return; }
+          if (resp.error) { setError("Gmail access denied."); clearTimeout(timeout); setScanning(false); setScanStatus(""); return; }
           const token = resp.access_token;
           localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
           setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(token);
-          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); setScanStatus(""); return; }
+          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); clearTimeout(timeout); setScanning(false); setScanStatus(""); return; }
           setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
@@ -582,7 +584,7 @@ export default function AppPage() {
           if (extracted.length === 0) {
             setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually or check if your subscription emails are in a different folder.`);
           }
-          setScannedItems(extracted); setScanning(false); setScanStatus("");
+          clearTimeout(timeout); setScannedItems(extracted); setScanning(false); setScanStatus("");
         },
       });
       const stored = getStoredToken();
@@ -606,12 +608,12 @@ export default function AppPage() {
           if (extracted.length === 0) {
             setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually.`);
           }
-          setScannedItems(extracted); setScanning(false); setScanStatus("");
+          clearTimeout(timeout); setScannedItems(extracted); setScanning(false); setScanStatus("");
           return;
         } catch {}
       }
       tokenClient.requestAccessToken();
-    } catch (e: any) { setError(e.message || "Connection failed."); setScanning(false); }
+    } catch (e: any) { clearTimeout(timeout); setError(e.message || "Connection failed."); setScanning(false); }
   }, []);
 
   const confirmScanned = useCallback((item: ScannedSub, idx: number) => {
