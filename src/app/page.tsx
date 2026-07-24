@@ -81,7 +81,7 @@ export default function HomePage() {
           ))}
         </div>
         <Link href="/cancel" className="block text-center text-[13px] text-[#86868b] mt-5 hover:text-[#1d1d1f] transition-colors">
-          View all 20 services →
+          View all 79 services →
         </Link>
       </div>
 

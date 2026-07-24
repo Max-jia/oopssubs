@@ -19,8 +19,6 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
     },
   };
 }
-  return cancelGuides.map((g) => ({ slug: g.slug }));
-}
 
 export default function CancelGuidePage({ params }: { params: { slug: string } }) {
   const guide = getGuide(params.slug);

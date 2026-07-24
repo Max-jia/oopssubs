@@ -9,7 +9,7 @@ export default function AllCancelGuides() {
         Back
       </Link>
       <h1 className="text-[28px] font-extrabold tracking-[-0.02em] mb-2">Cancel guides</h1>
-      <p className="text-[15px] text-[#86868b] mb-8">Step-by-step for 20 services. No fluff.</p>
+      <p className="text-[15px] text-[#86868b] mb-8">Step-by-step for {cancelGuides.length} services. No fluff.</p>
       <div className="card overflow-hidden p-0">
         {cancelGuides.map((g, i) => (
           <Link
