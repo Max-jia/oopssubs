@@ -458,18 +458,18 @@ export default function AppPage() {
   }, [subs]);
 
   const handleGmailScan = useCallback(async () => {
-    setScanning(true); setError("");
+    setScanning(true); setError(""); setScanStatus(""); setScannedItems([]);
     try {
       await gapiInit(); const oauth2 = await gisInit();
       const tokenClient = oauth2.initTokenClient({
         client_id: CLIENT_ID, scope: GMAIL_SCOPES,
         callback: async (resp: any) => {
-          if (resp.error) { setError("Gmail access denied."); setScanning(false); return; }
+          if (resp.error) { setError("Gmail access denied."); setScanning(false); setScanStatus(""); return; }
           const token = resp.access_token;
           localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
           setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(token);
-          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); return; }
+          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); setScanStatus(""); return; }
           setScanStatus(`Found ${messages.length} emails, reading...`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
@@ -478,20 +478,31 @@ export default function AppPage() {
           if (extracted.length === 0) {
             setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually or check if your subscription emails are in a different folder.`);
           }
-          setScannedItems(extracted); setScanning(false);
+          setScannedItems(extracted); setScanning(false); setScanStatus("");
         },
       });
       const stored = getStoredToken();
       if (stored) {
         try {
           await initGapiClient(stored);
+          setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(stored);
-          if (messages.length > 0) {
-            const bodies: string[] = [];
-            for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(stored, msg.id); if (body) bodies.push(body); }
-            setScannedItems(dedupeSubs(await extractSubsWithAI(bodies))); setScanning(false);
+          if (messages.length === 0) {
+            setScannedItems([]);
+            setError("No subscription-related emails found in the last 2 years. Try adding manually.");
+            setScanning(false);
             return;
           }
+          setScanStatus(`Found ${messages.length} emails, reading...`);
+          const bodies: { text: string; trialEnd: string }[] = [];
+          for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
+          setScanStatus(`Analyzing ${bodies.length} emails with AI...`);
+          const extracted = dedupeSubs(await extractSubsWithAI(bodies));
+          if (extracted.length === 0) {
+            setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually.`);
+          }
+          setScannedItems(extracted); setScanning(false); setScanStatus("");
+          return;
         } catch {}
       }
       tokenClient.requestAccessToken();
