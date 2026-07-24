@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 const guides = [
   { slug: 'netflix', name: 'Netflix', difficulty: 'easy' as const },
@@ -26,36 +29,72 @@ export default function HomePage() {
     <main className="min-h-screen animate-fade-in">
       {/* Hero */}
       <div className="max-w-md mx-auto px-6 pt-20 pb-14 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-[28px] bg-gradient-to-br from-[#1d1d1f] to-[#3a3a3c] shadow-[0_8px_30px_rgba(0,0,0,0.15)] mb-8 animate-scale-in">
-          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <motion.div
+          className="inline-flex items-center justify-center w-16 h-16 rounded-[28px] bg-gradient-to-br from-[#1d1d1f] to-[#3a3a3c] shadow-[0_8px_30px_rgba(0,0,0,0.15)] mb-8"
+          initial={{ scale: 0, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+        >
+          <motion.svg
+            className="w-7 h-7 text-white"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+            animate={{ scale: [1, 1.15, 1] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
             {iconPaths.sparkles}
-          </svg>
-        </div>
-        <h1 className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]">
+          </motion.svg>
+        </motion.div>
+        <motion.h1
+          className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
           Stop bleeding<br />on subscriptions
-        </h1>
-        <p className="text-[17px] text-[#86868b] leading-relaxed mb-10 max-w-xs mx-auto">
+        </motion.h1>
+        <motion.p
+          className="text-[17px] text-[#86868b] leading-relaxed mb-10 max-w-xs mx-auto"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.5 }}
+        >
           Connect your email. See everything you&apos;re paying for. Cancel what you don&apos;t need. Nothing stored on a server.
-        </p>
+        </motion.p>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
-          <Link
+          <motion.a
             href="/app?action=scan"
             className="btn-primary text-[17px] font-semibold py-4 w-full"
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ scale: 1.02, y: -2 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <motion.svg
+              className="w-5 h-5"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            >
               {iconPaths.mail}
-            </svg>
+            </motion.svg>
             Connect Gmail to scan
-          </Link>
-          <Link
+          </motion.a>
+          <motion.a
             href="/app?action=manual"
             className="btn-secondary text-[17px] py-4 w-full"
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <motion.svg
+              className="w-5 h-5"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+              animate={{ rotate: [0, 90, 90, 0] }}
+              transition={{ duration: 4, repeat: Infinity, times: [0, 0.1, 0.2, 0.3] }}
+            >
               {iconPaths.plus}
-            </svg>
+            </motion.svg>
             Add subscriptions manually
-          </Link>
+          </motion.a>
         </div>
       </div>
 
