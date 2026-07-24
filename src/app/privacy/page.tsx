@@ -46,7 +46,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="text-base font-semibold text-gray-900 mb-2">Contact</h2>
-          <p>This is a one-person project. If you have questions about privacy, email oopssubs@proton.me.</p>
+          <p>This is a one-person project. If you have questions about privacy, email jiayongchun001@gmail.com.</p>
         </section>
       </div>
     </main>

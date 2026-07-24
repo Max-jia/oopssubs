@@ -43,7 +43,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-[17px] font-semibold mb-2">7. Contact</h2>
-          <p>OopsSubs is a solo project. Reach out at oopssubs@proton.me.</p>
+          <p>OopsSubs is a solo project. Reach out at jiayongchun001@gmail.com.</p>
         </section>
       </div>
     </main>
