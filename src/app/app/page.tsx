@@ -87,10 +87,18 @@ async function initGapiClient(token: string) {
   (window as any).gapi.client.setToken({ access_token: token });
 }
 
-/* ── Step 1: Search with multiple queries for better coverage ── */
+/* ── Step 1: Multi-angle search for maximum coverage ── */
 const SUB_SEARCH_QUERIES = [
-  'subject:(receipt OR invoice OR "your" OR "renewal" OR "billed" OR "payment" OR "subscription" OR "membership" OR "monthly" OR "annual")',
-  'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR support@ OR info@ OR hello@ OR team@) newer_than:2y',
+  // 1. Direct subscription keywords (title + body, Gmail q= searches both)
+  '"subscription" OR "membership" OR "auto-renew" OR "recurring payment" newer_than:2y',
+  // 2. Billing/receipt language — catches most subscription charge emails
+  '("receipt" OR "invoice" OR "we charged" OR "has been charged" OR "payment confirmed" OR "thank you for your" OR "billing statement") newer_than:2y',
+  // 3. Renewal/plan language
+  '("your plan" OR "renewal" OR "renews on" OR "will renew" OR "monthly charge" OR "annual fee" OR "your next bill") newer_than:2y',
+  // 4. Free trial language — critical! These are future charges
+  '("free trial" OR "trial ends" OR "start your free" OR "cancel before" OR "trial period" OR "try it free") newer_than:2y',
+  // 5. Common billing sender patterns
+  'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR no-reply@ OR donotreply@) newer_than:2y',
 ];
 
 async function searchSubscriptionEmails(token: string): Promise<any[]> {
@@ -99,7 +107,7 @@ async function searchSubscriptionEmails(token: string): Promise<any[]> {
   for (const query of SUB_SEARCH_QUERIES) {
     try {
       const res = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=25`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=20`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();
@@ -108,7 +116,7 @@ async function searchSubscriptionEmails(token: string): Promise<any[]> {
       }
     } catch {}
   }
-  return allMessages.slice(0, 40);
+  return allMessages;
 }
 
 /* ── Step 2: Better email body extraction — try plain text first, fallback to HTML ── */
@@ -267,6 +275,20 @@ ${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
   } catch {
     return quickResults;
   }
+}
+
+/* ── Step 4.5: Deduplicate by sender domain before AI, keep max 2 per sender ── */
+function dedupeBodiesBySender(bodies: { text: string; trialEnd: string }[]): { text: string; trialEnd: string }[] {
+  const byDomain = new Map<string, { text: string; trialEnd: string }[]>();
+  for (const b of bodies) {
+    const match = b.text.match(/From:\s*.*?@([^\s\n>]+)/i);
+    const domain = match ? match[1].toLowerCase() : "unknown";
+    if (!byDomain.has(domain)) byDomain.set(domain, []);
+    if (byDomain.get(domain)!.length < 2) byDomain.get(domain)!.push(b);
+  }
+  const result: { text: string; trialEnd: string }[] = [];
+  for (const items of byDomain.values()) result.push(...items);
+  return result;
 }
 
 /* ── Step 5: Deduplicate final results ── */
@@ -473,8 +495,9 @@ export default function AppPage() {
           setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
-          setScanStatus(`AI analyzing ${bodies.length} emails...`);
-          const extracted = dedupeSubs(await extractSubsWithAI(bodies));
+          const dedupedBodies = dedupeBodiesBySender(bodies);
+          setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+          const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
           if (extracted.length === 0) {
             setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually or check if your subscription emails are in a different folder.`);
           }
@@ -496,8 +519,9 @@ export default function AppPage() {
           setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
-          setScanStatus(`AI analyzing ${bodies.length} emails...`);
-          const extracted = dedupeSubs(await extractSubsWithAI(bodies));
+          const dedupedBodies = dedupeBodiesBySender(bodies);
+          setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+          const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
           if (extracted.length === 0) {
             setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually.`);
           }
