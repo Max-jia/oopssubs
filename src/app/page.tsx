@@ -143,6 +143,7 @@ export default function HomePage() {
       {/* Footer */}
       <div className="max-w-md mx-auto px-6 pb-10 text-center space-x-4">
         <Link href="/privacy" className="nav-link">Privacy</Link>
+        <Link href="/terms" className="nav-link">Terms</Link>
         <Link href="/cancel" className="nav-link">All guides</Link>
       </div>
     </main>
