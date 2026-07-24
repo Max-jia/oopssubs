@@ -5,6 +5,7 @@ export interface CancelGuide {
   steps: string[];
   directLink?: string;
   warning?: string;
+  citation?: string;
 }
 
 export const cancelGuides: CancelGuide[] = [
@@ -38,6 +39,7 @@ export const cancelGuides: CancelGuide[] = [
     name: 'Amazon Prime',
     difficulty: 'medium',
     directLink: 'https://www.amazon.com/mc/prime',
+    citation: '📊 In 2025, Amazon agreed to a $2.5 billion FTC settlement — the largest civil penalty in FTC history — over allegations it used "dark patterns" to trick consumers into Prime enrollment and created a deliberately complex cancellation process. (Source: FTC.gov, Sept 2025)',
     steps: [
       'Go to amazon.com/mc/prime',
       'Click "End membership"',
@@ -188,7 +190,7 @@ export const cancelGuides: CancelGuide[] = [
   // ── Food & delivery ──
   { slug: 'hello-fresh', name: 'HelloFresh', difficulty: 'easy', steps: ['Go to hellofresh.com/account/settings', 'Click "Cancel Plan"', 'HelloFresh will ask why — pick any reason', 'Confirm'], warning: 'Cancel at least 5 days before your next delivery to avoid being charged.' },
   { slug: 'blue-apron', name: 'Blue Apron', difficulty: 'easy', steps: ['Go to blueapron.com/account/settings', 'Click "Cancel Subscription"', 'Confirm'], warning: 'Cancel at least 5 days before your next delivery.' },
-  { slug: 'uber-one', name: 'Uber One', difficulty: 'medium', steps: ['App → Account → Uber One → Manage Membership → End Membership', 'Uber may show multiple "are you sure?" screens — keep clicking'], warning: 'FTC sued Uber over this. Cancel requires up to 32 actions across 23 screens.' },
+  { slug: 'uber-one', name: 'Uber One', difficulty: 'medium', citation: '📊 FTC court documents (Dec 2025) allege canceling Uber One requires up to 32 actions across 23 screens. The FTC is actively litigating this case. (Source: FTC v. Uber, N.D. Cal.)', steps: ['App → Account → Uber One → Manage Membership → End Membership', 'Uber may show multiple "are you sure?" screens — keep clicking'], warning: 'FTC sued Uber over this. Cancel requires up to 32 actions across 23 screens.' },
   { slug: 'grubhub-plus', name: 'Grubhub+', difficulty: 'easy', steps: ['App → Account → Grubhub+ → Manage → Cancel Subscription', 'Confirm'] },
   { slug: 'instacart-plus', name: 'Instacart+', difficulty: 'easy', steps: ['App → Account → Instacart+ → Manage → Cancel', 'Confirm'] },
   // ── Fitness ──

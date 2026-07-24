@@ -1,8 +1,24 @@
 import { getGuide, cancelGuides } from "@/data/cancel-guides";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 
 export function generateStaticParams() {
+  return cancelGuides.map((g) => ({ slug: g.slug }));
+}
+
+export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
+  const guide = getGuide(params.slug);
+  if (!guide) return {};
+  return {
+    title: `How to Cancel ${guide.name} in ${guide.steps.length} Steps (2026)`,
+    description: `Step-by-step guide to cancel your ${guide.name} subscription. ${guide.difficulty === 'hard' ? 'Includes phone numbers and mail-in options.' : 'Takes just a few minutes.'} ${guide.warning ? guide.warning.slice(0, 120) : ''}`,
+    openGraph: {
+      title: `How to Cancel ${guide.name} — ${guide.difficulty === 'easy' ? 'Takes 2 Minutes' : guide.difficulty === 'medium' ? 'Takes 5 Minutes' : 'We\'ll Walk You Through It'}`,
+      description: `${guide.steps.length} easy-to-follow steps. Updated July 2026.`,
+    },
+  };
+}
   return cancelGuides.map((g) => ({ slug: g.slug }));
 }
 
@@ -72,6 +88,41 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
         </a>
       )}
+
+      {/* Data citation */}
+      {guide.citation && (
+        <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-4 text-[13px] text-[#86868b] leading-relaxed">
+          {guide.citation}
+        </div>
+      )}
+
+      {/* FAQ */}
+      <div className="card mb-4">
+        <h3 className="text-[15px] font-semibold mb-3">FAQ</h3>
+        <div className="space-y-3 text-[14px]">
+          <div>
+            <p className="font-medium text-[#1d1d1f]">Will I lose my data if I cancel?</p>
+            <p className="text-[#86868b]">Most services keep your data for a period after cancellation. {guide.name} is no exception — you typically retain access until the end of your billing cycle.</p>
+          </div>
+          <div>
+            <p className="font-medium text-[#1d1d1f]">Can I get a refund?</p>
+            <p className="text-[#86868b]">Most subscription services do not offer prorated refunds. Cancel right before your renewal date to maximize value.</p>
+          </div>
+          <div>
+            <p className="font-medium text-[#1d1d1f]">What if the cancel button is missing?</p>
+            <p className="text-[#86868b]">
+              {guide.difficulty === 'hard'
+                ? `${guide.name} is known for making cancellation difficult. If you can\'t find the option, try a different device or browser, or use the phone number listed above.`
+                : 'Try a different device or browser. Some services hide cancel options on mobile. Switch to desktop view.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Freshness signal */}
+      <p className="text-center text-[12px] text-[#aeaeb2] mb-4">
+        Last updated: July 24, 2026 · Cancel guides verified by OopsSubs
+      </p>
 
       <div className="card text-center py-8 mt-6">
         <h3 className="text-[17px] font-semibold mb-1">One at a time?</h3>
