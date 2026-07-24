@@ -16,8 +16,26 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
     hard: { text: 'Brace yourself', className: 'badge-hard' },
   }[guide.difficulty];
 
+  // Google HowTo structured data for rich results
+  const howToSchema = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": `How to cancel ${guide.name}`,
+    "description": `Step-by-step guide to cancel your ${guide.name} subscription or membership. ${guide.difficulty === 'hard' ? 'May require phone call or in-person visit.' : 'Takes just a few minutes.'}`,
+    "totalTime": guide.difficulty === 'easy' ? 'PT2M' : guide.difficulty === 'medium' ? 'PT5M' : 'PT15M',
+    "step": guide.steps.map((step, i) => ({
+      "@type": "HowToStep",
+      "position": i + 1,
+      "text": step,
+    })),
+  };
+
   return (
     <main className="min-h-screen max-w-md mx-auto px-6 py-12 animate-fade-in">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
       <Link href="/cancel" className="nav-link inline-flex items-center gap-1 mb-6">
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
         All guides

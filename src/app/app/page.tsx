@@ -18,9 +18,10 @@ interface ScannedSub {
   name: string;
   amount: number;
   cycle: "monthly" | "yearly";
-  confidence: "high" | "low";
+  confidence: "high" | "medium" | "low";
   isTrial?: boolean;
-  trialEnd?: string; // YYYY-MM-DD
+  trialEnd?: string;
+  source?: string; // "Sender Name <email>" from the matched email
 }
 
 /* ── Helpers ── */
@@ -87,28 +88,16 @@ async function initGapiClient(token: string) {
   (window as any).gapi.client.setToken({ access_token: token });
 }
 
-/* ── Step 1: Multi-language + multi-angle coverage ── */
+/* ── Step 1: Subject-first precision search + broad supplementary ── */
 const SUB_SEARCH_QUERIES = [
-  // English — billing + subscription + renewal
-  '("receipt" OR "invoice" OR "we charged" OR "payment confirmed" OR "subscription" OR "membership" OR "auto-renew" OR "recurring payment" OR "your plan" OR "renewal" OR "monthly charge" OR "annual fee") newer_than:2y',
-  // English — free trial
-  '("free trial" OR "trial ends" OR "start your free" OR "cancel before" OR "trial period" OR "try it free") newer_than:2y',
-  // 中文 (简/繁) — 付款/订阅/续费/会员
-  '("付款" OR "账单" OR "扣款" OR "订阅" OR "续费" OR "会员" OR "自动续费" OR "免費試用" OR "免费试用" OR "訂閱") newer_than:2y',
-  // 日本語 — 支払い/サブスク/会員/自動更新
-  '("支払い" OR "請求" OR "サブスクリプション" OR "会員" OR "自動更新" OR "定期購読" OR "無料トライアル" OR "更新" OR "決済") newer_than:2y',
-  // 한국어 — 결제/구독/멤버십/자동갱신
-  '("결제" OR "청구" OR "구독" OR "멤버십" OR "자동 갱신" OR "정기 결제" OR "무료 체험" OR "갱신") newer_than:2y',
-  // Español — suscripción/factura/renovación
-  '("suscripción" OR "factura" OR "membresía" OR "renovación" OR "cobro" OR "pago" OR "prueba gratuita" OR "cuota") newer_than:2y',
-  // Français — abonnement/facture/renouvellement
-  '("abonnement" OR "facture" OR "paiement" OR "renouvellement" OR "prélèvement" OR "essai gratuit" OR "souscription" OR "forfait") newer_than:2y',
-  // Deutsch — Abonnement/Rechnung/Verlängerung
-  '("Abonnement" OR "Rechnung" OR "Zahlung" OR "Mitgliedschaft" OR "Verlängerung" OR "Abbuchung" OR "kostenlose Testversion" OR "Beitrag") newer_than:2y',
-  // Português — assinatura/fatura/renovação
-  '("assinatura" OR "fatura" OR "pagamento" OR "renovação" OR "cobrança" OR "teste grátis" OR "plano" OR "mensalidade") newer_than:2y',
-  // Common billing senders (all languages)
-  'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR no-reply@ OR donotreply@) newer_than:2y',
+  // Primary: subject line only — high precision, low noise
+  'subject:(receipt OR invoice OR subscription OR membership OR renewal OR billed OR payment OR "your plan" OR "monthly charge" OR "annual fee") newer_than:2y',
+  // Free trials in subject
+  'subject:("free trial" OR "trial ends" OR "welcome to" OR "your subscription") newer_than:2y',
+  // Billing senders
+  'from:(noreply@ OR billing@ OR payments@ OR accounts@ OR no-reply@) newer_than:2y',
+  // Multi-language (body search — supplementary, lower priority)
+  '("订阅" OR "续费" OR "自動更新" OR "구독" OR "suscripción" OR "abonnement" OR "Abonnement") newer_than:2y',
 ];
 
 async function searchSubscriptionEmails(token: string): Promise<any[]> {
@@ -198,28 +187,62 @@ async function getEmailBody(token: string, msgId: string): Promise<{ text: strin
 }
 
 /* ── Step 3: Simple regex fallback for common patterns ── */
+const KNOWN_SERVICES: [RegExp, string, "monthly"|"yearly"][] = [
+  [/netflix/i, "Netflix", "monthly"],
+  [/spotify/i, "Spotify", "monthly"],
+  [/disney\+|disneyplus/i, "Disney+", "monthly"],
+  [/hulu/i, "Hulu", "monthly"],
+  [/hbo\s*max|max\.com/i, "Max", "monthly"],
+  [/youtube\s*premium|youtube\s*music/i, "YouTube Premium", "monthly"],
+  [/apple\s*music/i, "Apple Music", "monthly"],
+  [/apple\s*(?:one|tv\+|arcade|fitness|news\+)/i, "Apple Services", "monthly"],
+  [/amazon\s*prime/i, "Amazon Prime", "yearly"],
+  [/amazon\s*audible|audible/i, "Audible", "monthly"],
+  [/adobe\s*(?:cc|creative|photoshop|lightroom|illustrator|premiere)/i, "Adobe CC", "monthly"],
+  [/dropbox/i, "Dropbox", "monthly"],
+  [/notion/i, "Notion", "monthly"],
+  [/github\s*(?:pro|copilot|team)/i, "GitHub", "monthly"],
+  [/linkedin\s*premium/i, "LinkedIn Premium", "monthly"],
+  [/tinder|bumble|hinge|match\.com/i, "Dating App", "monthly"],
+  [/onlyfans|patreon|substack/i, "Content Creator", "monthly"],
+  [/doordash\s*dashpass|uber\s*one|grubhub\+/i, "Delivery Pass", "monthly"],
+  [/planet\s*fitness|peloton|classpass|calm|headspace/i, "Health & Fitness", "monthly"],
+  [/nytimes|wsj|washington\s*post|the\s*atlantic|bloomberg/i, "News", "monthly"],
+  [/xbox|playstation|nintendo|xgp|ps\s*plus/i, "Gaming", "monthly"],
+  [/icloud|google\s*one|microsoft\s*365|office\s*365/i, "Cloud Storage", "monthly"],
+  [/nordvpn|expressvpn|surfshark|protonvpn/i, "VPN", "monthly"],
+];
+
 function quickRegexExtract(text: string): ScannedSub | null {
-  // Netflix
-  const netflix = text.match(/Netflix.*?\$?(\d+\.?\d*)/i);
-  if (netflix) return { name: "Netflix", amount: parseFloat(netflix[1]), cycle: "monthly", confidence: "high" };
-  // Spotify
-  const spotify = text.match(/Spotify.*?\$?(\d+\.?\d*)/i);
-  if (spotify) return { name: "Spotify", amount: parseFloat(spotify[1]), cycle: "monthly", confidence: "high" };
-  // Hulu
-  const hulu = text.match(/Hulu.*?\$?(\d+\.?\d*) or (\d+\.?\d*)\/mo/i);
-  if (hulu) {
-    const amt = parseFloat(hulu[1] || hulu[2]);
-    if (amt > 0) return { name: "Hulu", amount: amt, cycle: "monthly", confidence: "high" };
+  // Try known service patterns
+  for (const [pattern, name, cycle] of KNOWN_SERVICES) {
+    if (pattern.test(text)) {
+      // Find dollar amount near the service name
+      const amtMatch = text.match(/\$?\s*(\d+\.?\d{0,2})\s*(?:\/|per\s+)?\s*(?:month|mo|year|yr|\$)/i);
+      if (amtMatch) {
+        const amt = parseFloat(amtMatch[1]);
+        if (amt >= 0.99 && amt <= 999) {
+          return { name, amount: amt, cycle, confidence: "high" };
+        }
+      }
+      // Found service name but no clear amount
+      const anyAmt = text.match(/\$?\s?(\d{2,4}\.?\d{0,2})/);
+      if (anyAmt) {
+        const amt = parseFloat(anyAmt[1]);
+        if (amt >= 0.99 && amt <= 999) {
+          return { name, amount: amt, cycle, confidence: "medium" };
+        }
+      }
+      return { name, amount: 0, cycle, confidence: "low" };
+    }
   }
-  // Amazon Prime - detect membership fee
-  const prime = text.match(/Prime.*?membership.*?\$?(\d+\.?\d*)/i);
-  if (prime) return { name: "Amazon Prime", amount: parseFloat(prime[1]), cycle: "yearly", confidence: "medium" };
-  // Generic: look for "$XX.XX/month" pattern
-  const generic = text.match(/(\d+\.?\d*)\s*\/\s*(month|mo|year|yr)/i);
-  if (generic) {
-    const amt = parseFloat(generic[1]);
-    const cycle = generic[2].startsWith("y") ? "yearly" : "monthly";
-    if (amt >= 0.99 && amt <= 999) return { name: "Subscription", amount: amt, cycle: cycle as "monthly"|"yearly", confidence: "low" };
+  // Generic: "$XX.XX" anywhere in a billing email
+  const billing = text.match(/(?:total|amount|charged|paid|fee|price|cost).*?\$?\s*(\d+\.?\d{0,2})/i);
+  if (billing) {
+    const amt = parseFloat(billing[1]);
+    if (amt >= 0.99 && amt <= 999) {
+      return { name: "Subscription", amount: amt, cycle: "monthly", confidence: "low" };
+    }
   }
   return null;
 }
@@ -233,6 +256,8 @@ async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): 
     const q = quickRegexExtract(body.text);
     if (q) {
       if (body.trialEnd) { q.isTrial = true; q.trialEnd = body.trialEnd; q.confidence = "medium"; }
+      const from = body.text.match(/From:\s*(.+)/m);
+      if (from) q.source = from[1].trim();
       quickResults.push(q);
     } else {
       remaining.push(body);
@@ -242,7 +267,15 @@ async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): 
     return quickResults;
   }
 
-  const prompt = `You are analyzing emails in multiple languages (English, Chinese, Japanese, Korean, Spanish, French, German, Portuguese, etc.) to find subscriptions the user needs to manage.
+  const prompt = `You are analyzing emails in multiple languages to find subscriptions the user needs to manage.
+
+CRITICAL: Never return a name of "Subscription". Always determine the actual service name from:
+- The "From:" address (e.g., "noreply@netflix.com" → Netflix)
+- The "Subject:" line (look for brand names)
+- The email body content (logo text, app name, service branding)
+- Branded greeting lines like "Your Netflix payment" or "Spotify からのお知らせ"
+
+If you truly cannot determine the service name, use the sender's company name extracted from the From address (e.g., "noreply@zoom.us" → "Zoom"). The name "Subscription" is NEVER acceptable.
 
 Include BOTH:
 1. Active paid subscriptions (user is currently being charged)
@@ -280,7 +313,44 @@ ${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || "[]";
     const cleaned = text.replace(/```(?:json)?\s*|\s*```/g, "").trim();
-    const aiResults: ScannedSub[] = JSON.parse(cleaned);
+    let aiResults: ScannedSub[] = JSON.parse(cleaned);
+    // Post-process: fix generic names and missing amounts from email data
+    aiResults = aiResults.map((s: ScannedSub) => {
+      const isGeneric = /subscription|unknown/i.test(s.name);
+      if (isGeneric || s.amount === 0) {
+        const allText = [...remaining.map((r: any) => r.text || r), ...bodies.map((b: any) => b.text || b)].join("\n");
+        // Try known service patterns first
+        if (isGeneric) {
+          for (const [pattern, svcName] of KNOWN_SERVICES) {
+            if (pattern.test(allText)) { s.name = svcName; s.confidence = "medium"; break; }
+          }
+        }
+        // If still generic, try From: header
+        if (/subscription|unknown/i.test(s.name)) {
+          const fromName = allText.match(/From:\s*["']?([A-Z][A-Za-z0-9&.\s]{2,30}?)(?:\s*<|$)/m);
+          if (fromName && !/noreply|billing|payments|accounts|support|hello|info/i.test(fromName[1])) {
+            s.name = fromName[1].trim(); s.confidence = "low";
+          } else {
+            const fromDomain = allText.match(/From:.*?@([a-z0-9-]+)\.(?:com|co|io|net|org|app|dev)/i);
+            if (fromDomain && !/noreply|mail|email|billing|payments/i.test(fromDomain[1])) {
+              const dn = fromDomain[1].charAt(0).toUpperCase() + fromDomain[1].slice(1);
+              if (dn.length > 2) { s.name = dn; s.confidence = "low"; }
+            }
+          }
+        }
+        // Always capture source for generic entries
+        if (!s.source) {
+          const fromLine = allText.match(/From:\s*(.+)/m);
+          if (fromLine) s.source = fromLine[1].trim();
+        }
+        // If amount missing, search for it
+        if (s.amount === 0) {
+          const amtMatch = allText.match(/\$\s?(\d+\.?\d{0,2})/);
+          if (amtMatch) { s.amount = parseFloat(amtMatch[1]); }
+        }
+      }
+      return s;
+    });
     return [...quickResults, ...aiResults];
   } catch {
     return quickResults;
@@ -294,10 +364,10 @@ function dedupeBodiesBySender(bodies: { text: string; trialEnd: string }[]): { t
     const match = b.text.match(/From:\s*.*?@([^\s\n>]+)/i);
     const domain = match ? match[1].toLowerCase() : "unknown";
     if (!byDomain.has(domain)) byDomain.set(domain, []);
-    if (byDomain.get(domain)!.length < 2) byDomain.get(domain)!.push(b);
+    if (byDomain.get(domain)!.length < 3) byDomain.get(domain)!.push(b);
   }
   const result: { text: string; trialEnd: string }[] = [];
-  for (const items of byDomain.values()) result.push(...items);
+  byDomain.forEach((items) => result.push(...items));
   return result;
 }
 
@@ -311,7 +381,7 @@ function dedupeSubs(items: ScannedSub[]): ScannedSub[] {
       map.set(key, item);
     }
   }
-  return [...map.values()];
+  return Array.from(map.values());
 }
 
 /* ── Calendar ICS generator ── */
@@ -502,14 +572,14 @@ export default function AppPage() {
           setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(token);
           if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); setScanStatus(""); return; }
-          setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
+          setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
-          for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
+          for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
           const dedupedBodies = dedupeBodiesBySender(bodies);
           setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
           const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
           if (extracted.length === 0) {
-            setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually or check if your subscription emails are in a different folder.`);
+            setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually or check if your subscription emails are in a different folder.`);
           }
           setScannedItems(extracted); setScanning(false); setScanStatus("");
         },
@@ -526,14 +596,14 @@ export default function AppPage() {
             setScanning(false);
             return;
           }
-          setScanStatus(`Reading ${Math.min(messages.length, 25)} emails...`);
+          setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
           const bodies: { text: string; trialEnd: string }[] = [];
-          for (const msg of messages.slice(0, 25)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
+          for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
           const dedupedBodies = dedupeBodiesBySender(bodies);
           setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
           const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
           if (extracted.length === 0) {
-            setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually.`);
+            setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually.`);
           }
           setScannedItems(extracted); setScanning(false); setScanStatus("");
           return;
@@ -604,11 +674,29 @@ export default function AppPage() {
 
         {/* Scanning */}
         {scanning && (
-          <div className="text-center py-16 animate-scale-in">
-            <div className="w-12 h-12 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mx-auto mb-5">
-              <svg className="w-6 h-6 text-[#86868b] animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg>
+          <div className="text-center py-12 animate-scale-in">
+            {/* Animated envelope icon */}
+            <div className="relative w-20 h-20 mx-auto mb-6">
+              {/* Outer ring pulsing */}
+              <div className="absolute inset-0 rounded-full border-2 border-[#e5e5ea] animate-pulse" />
+              {/* Envelope */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="relative w-10 h-10">
+                  <svg className="w-10 h-10 text-[#1d1d1f] envelope-float" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                  {/* Scanning line */}
+                  <div className="scan-line" />
+                </div>
+              </div>
             </div>
-            <p className="text-[17px] font-semibold mb-1">{scanStatus || "Scanning your inbox"}</p>
+            <p className="text-[17px] font-semibold mb-2">{scanStatus || "Scanning your inbox"}</p>
+            {/* Animated dots */}
+            <div className="flex items-center justify-center gap-1.5 mb-3">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
+            </div>
             <p className="text-[14px] text-[#86868b]">We never store your emails. This stays on your device.</p>
           </div>
         )}
@@ -654,6 +742,9 @@ export default function AppPage() {
                         </span>
                       )}
                     </div>
+                    {item.source && (
+                      <div className="text-[11px] text-[#aeaeb2] mt-0.5 truncate max-w-[200px]">{item.source}</div>
+                    )}
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <button onClick={() => dismissScanned(i)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
