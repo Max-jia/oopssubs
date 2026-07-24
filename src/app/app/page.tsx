@@ -386,6 +386,7 @@ function SubscriptionRow({ sub, onDelete }: { sub: Subscription; onDelete: () =>
 export default function AppPage() {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState("");
   const [scannedItems, setScannedItems] = useState<ScannedSub[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState("");
@@ -466,12 +467,18 @@ export default function AppPage() {
           if (resp.error) { setError("Gmail access denied."); setScanning(false); return; }
           const token = resp.access_token;
           localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
+          setScanStatus("Searching inbox...");
           const messages = await searchSubscriptionEmails(token);
-          if (messages.length === 0) { setScannedItems([]); setError("No subscription emails found. Try adding manually."); setScanning(false); return; }
+          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); setScanning(false); return; }
+          setScanStatus(`Found ${messages.length} emails, reading...`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 15)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
-          const extracted = await extractSubsWithAI(bodies);
-          setScannedItems(dedupeSubs(extracted)); setScanning(false);
+          setScanStatus(`Analyzing ${bodies.length} emails with AI...`);
+          const extracted = dedupeSubs(await extractSubsWithAI(bodies));
+          if (extracted.length === 0) {
+            setError(`Scanned ${messages.length} emails but couldn't detect subscriptions. Try adding manually or check if your subscription emails are in a different folder.`);
+          }
+          setScannedItems(extracted); setScanning(false);
         },
       });
       const stored = getStoredToken();
@@ -556,7 +563,7 @@ export default function AppPage() {
             <div className="w-12 h-12 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mx-auto mb-5">
               <svg className="w-6 h-6 text-[#86868b] animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" /></svg>
             </div>
-            <p className="text-[17px] font-semibold mb-1">Scanning your inbox</p>
+            <p className="text-[17px] font-semibold mb-1">{scanStatus || "Scanning your inbox"}</p>
             <p className="text-[14px] text-[#86868b]">We never store your emails. This stays on your device.</p>
           </div>
         )}
