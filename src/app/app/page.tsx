@@ -279,8 +279,48 @@ function dedupeSubs(items: ScannedSub[]): ScannedSub[] {
   return [...map.values()];
 }
 
+/* ── Calendar ICS generator ── */
+function generateICS(sub: Subscription): string {
+  const d = new Date(sub.nextDate + "T10:00:00");
+  const end = new Date(d.getTime() + 3600000);
+  const fmt = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const uid = `${sub.id}@oopssubs.com`;
+  const summary = `Cancel ${sub.name}? (${fmtCurrency(sub.amount)}/${sub.cycle === "monthly" ? "mo" : "yr"})`;
+
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//OopsSubs//EN",
+    "BEGIN:VEVENT",
+    `DTSTART:${fmt(d)}`, `DTEND:${fmt(end)}`, `UID:${uid}`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${sub.name} renews today. Open OopsSubs to cancel or manage.\\n\\nAmount: ${fmtCurrency(sub.amount)}/${sub.cycle}`,
+    "BEGIN:VALARM", "TRIGGER:-P1D", "ACTION:DISPLAY",
+    `DESCRIPTION:${sub.name} renews tomorrow — ${fmtCurrency(sub.amount)}`,
+    "END:VALARM",
+    "BEGIN:VALARM", "TRIGGER:-P3D", "ACTION:DISPLAY",
+    `DESCRIPTION:${sub.name} renews in 3 days`,
+    "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+}
+
+function addToCalendar(sub: Subscription) {
+  const ics = generateICS(sub);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  // Try to open native calendar app via data URI
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `oopssubs-${sub.name.toLowerCase().replace(/\s+/g, "-")}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 /* ── Subscription Row ── */
 function SubscriptionRow({ sub, onDelete }: { sub: Subscription; onDelete: () => void }) {
+  const [addedToCal, setAddedToCal] = useState(false);
   const days = daysUntil(sub.nextDate);
   const urgency = days <= 3 ? "text-[#c62828] bg-[#ffebee]" : days <= 7 ? "text-[#e65100] bg-[#fff3e0]" : "text-[#86868b] bg-[#f5f5f7]";
   return (
@@ -298,6 +338,17 @@ function SubscriptionRow({ sub, onDelete }: { sub: Subscription; onDelete: () =>
         <span className={`text-[12px] font-medium px-2.5 py-1 rounded-full ${urgency}`}>
           {days <= 0 ? "Due" : days === 1 ? "Tmrw" : `${days}d`}
         </span>
+        <button
+          onClick={() => { addToCalendar(sub); setAddedToCal(true); setTimeout(() => setAddedToCal(false), 2000); }}
+          className="opacity-0 group-hover:opacity-100 text-[#aeaeb2] hover:text-[#1d1d1f] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[#e8e8ed] flex items-center justify-center"
+          title="Add to calendar"
+        >
+          {addedToCal ? (
+            <svg className="w-4 h-4 text-[#2e7d32]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
+          )}
+        </button>
         <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-[#aeaeb2] hover:text-[#c62828] transition-all duration-200 text-lg leading-none w-6 h-6 rounded-full hover:bg-[#ffebee] flex items-center justify-center">&times;</button>
       </div>
     </div>
