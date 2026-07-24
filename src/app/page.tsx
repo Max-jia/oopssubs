@@ -30,19 +30,20 @@ export default function HomePage() {
       {/* Hero */}
       <div className="max-w-md mx-auto px-6 pt-20 pb-14 text-center">
         <motion.div
-          className="inline-flex items-center justify-center w-16 h-16 rounded-[28px] bg-gradient-to-br from-[#1d1d1f] to-[#3a3a3c] shadow-[0_8px_30px_rgba(0,0,0,0.15)] mb-8"
+          className="mb-8"
           initial={{ scale: 0, rotate: -10 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
         >
-          <motion.svg
-            className="w-7 h-7 text-white"
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {iconPaths.sparkles}
-          </motion.svg>
+          <motion.img
+            src="/icon-512.png"
+            alt="OopsSubs"
+            className="w-20 h-20 mx-auto"
+            animate={{ scale: [1, 1.04, 1], y: [0, -4, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            whileHover={{ scale: 1.12, rotate: [0, -3, 3, 0], transition: { duration: 0.6 } }}
+            whileTap={{ scale: 0.9 }}
+          />
         </motion.div>
         <motion.h1
           className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"

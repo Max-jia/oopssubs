@@ -201,6 +201,25 @@
 .dot-pulse:nth-child(2) { animation-delay: 0.2s; }
 .dot-pulse:nth-child(3) { animation-delay: 0.4s; }
 
+/* ── Logo breathing + subtle float ── */
+@keyframes logoBreathe {
+  0%, 100% { transform: scale(1) translateY(0); filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08)); }
+  50% { transform: scale(1.03) translateY(-3px); filter: drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
+}
+
+@keyframes logoWink {
+  0%, 94%, 100% { opacity: 1; }
+  95%, 97% { opacity: 0.15; }
+}
+
+.logo-breathe { animation: logoBreathe 4s ease-in-out infinite; }
+
+/* Fake blink overlay — positioned absolutely over the O's */
+.logo-eyes {
+  @apply absolute inset-0 flex items-center justify-center pointer-events-none;
+  animation: logoWink 6s ease-in-out infinite;
+}
+
 /* ── Animation utility classes ── */
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 .animate-slide-down { animation: slideDown 0.45s ease-out forwards; }
