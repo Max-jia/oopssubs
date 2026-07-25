@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
+import { getAppStoreSubscriptions } from "@/lib/app-store-scan";
 
 /* ── Types ── */
 interface Subscription {
@@ -559,6 +560,15 @@ export default function AppPage() {
     const updated = subs.filter((s) => s.id !== id);
     setSubs(updated); saveSubs(updated);
   }, [subs]);
+
+  const handleAppStoreScan = useCallback(async () => {
+    const subs = await getAppStoreSubscriptions();
+    if (!subs.length) { setError("No active App Store subscriptions found."); return; }
+    setScannedItems(subs.map((s) => ({
+      name: s.name, amount: s.amount || 0, cycle: s.cycle || "monthly",
+      confidence: "high" as const, isTrial: false,
+    })));
+  }, []);
 
   const handleGmailScan = useCallback(async () => {
     setScanning(true); setError(""); setScanStatus(""); setScannedItems([]);
