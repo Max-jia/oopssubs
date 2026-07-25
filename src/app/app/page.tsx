@@ -5,6 +5,17 @@ import Link from "next/link";
 import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions } from "@/lib/app-store-scan";
+import { cancelGuides } from "@/data/cancel-guides";
+
+// ── Known sender domain → service name mapping (auto-generated from cancel guides)
+const SENDER_DOMAIN_MAP: Record<string, string> = {};
+for (const g of cancelGuides) {
+  const slug = g.slug;
+  const domainHints = [slug.replace(/-/g, ''), slug.replace(/-plus|-premium|-cc|-pass|-tv|-app/g, '')];
+  for (const hint of domainHints) {
+    SENDER_DOMAIN_MAP[hint] = g.name;
+  }
+}
 
 /* ── Types ── */
 interface Subscription {
@@ -215,6 +226,49 @@ const KNOWN_SERVICES: [RegExp, string, "monthly"|"yearly"][] = [
   [/nordvpn|expressvpn|surfshark|protonvpn/i, "VPN", "monthly"],
 ];
 
+/* ── V2: Sender domain matching against known services ── */
+function matchSenderDomain(fromHeader: string): string | null {
+  const domain = fromHeader.match(/@([a-z0-9-]+)\.(?:com|co|io|net|org|app|dev)/i)?.[1]?.toLowerCase();
+  if (!domain) return null;
+  // Direct lookup in cancel guides
+  for (const g of cancelGuides) {
+    const slugKey = g.slug.replace(/-plus|-premium|-cc|-pass|-tv|-app|-online|-sub/g, '');
+    if (domain.includes(slugKey) || slugKey.includes(domain)) return g.name;
+  }
+  // Known sender domains
+  const knownSenders: Record<string, string> = {
+    'netflix': 'Netflix', 'spotify': 'Spotify', 'hulu': 'Hulu', 'disneyplus': 'Disney+',
+    'youtube': 'YouTube Premium', 'amazon': 'Amazon', 'adobe': 'Adobe',
+    'apple': 'Apple', 'linkedin': 'LinkedIn', 'microsoft': 'Microsoft',
+    'dropbox': 'Dropbox', 'notion': 'Notion', 'evernote': 'Evernote',
+    'nytimes': 'NYT', 'wsj': 'WSJ', 'washingtonpost': 'Washington Post',
+    'spotify': 'Spotify', 'tinder': 'Tinder', 'bumble': 'Bumble', 'hinge': 'Hinge',
+    'doordash': 'DoorDash', 'ubereats': 'Uber', 'instacart': 'Instacart',
+    'peloton': 'Peloton', 'calm': 'Calm', 'headspace': 'Headspace',
+    'hellofresh': 'HelloFresh', 'blueapron': 'Blue Apron', 'chegg': 'Chegg',
+    'coursera': 'Coursera', 'skillshare': 'Skillshare', 'duolingo': 'Duolingo',
+    'discord': 'Discord', 'patreon': 'Patreon', 'substack': 'Substack',
+    'xbox': 'Xbox', 'playstation': 'PlayStation', 'nintendo': 'Nintendo',
+    'siriusxm': 'SiriusXM', 'pandora': 'Pandora', 'tidal': 'Tidal',
+    'norton': 'Norton', 'mcafee': 'McAfee', 'expressvpn': 'ExpressVPN',
+    'nordvpn': 'NordVPN', 'surfshark': 'Surfshark',
+    'canva': 'Canva', 'grammarly': 'Grammarly', 'lastpass': 'LastPass',
+    '1password': '1Password', 'walmart': 'Walmart+', 'barkbox': 'BarkBox',
+    'masterclass': 'MasterClass', 'babbel': 'Babbel',
+    'medium': 'Medium', 'reddit': 'Reddit', 'twitch': 'Twitch',
+    'ea.com': 'EA Play', 'fubo': 'FuboTV', 'sling': 'Sling TV',
+    'starz': 'Starz', 'crunchyroll': 'Crunchyroll', 'peacock': 'Peacock',
+    'paramount': 'Paramount+', 'max.com': 'Max', 'onlyfans': 'OnlyFans',
+    'planetfitness': 'Planet Fitness', 'classpass': 'ClassPass',
+    'myfitnesspal': 'MyFitnessPal', 'strava': 'Strava', 'fitbit': 'Fitbit',
+    'audible': 'Audible', 'kindle': 'Kindle Unlimited',
+  };
+  for (const [key, name] of Object.entries(knownSenders)) {
+    if (domain.includes(key) || key.includes(domain)) return name;
+  }
+  return null;
+}
+
 function quickRegexExtract(text: string): ScannedSub | null {
   // Try known service patterns
   for (const [pattern, name, cycle] of KNOWN_SERVICES) {
@@ -255,6 +309,27 @@ async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): 
   const quickResults: ScannedSub[] = [];
   const remaining: { text: string; trialEnd: string }[] = [];
   for (const body of bodies) {
+    // Layer 1: Try sender domain matching (most reliable)
+    const fromHeader = body.text.match(/From:\s*.*?@([^\s\n]+)/i)?.[1] || body.text.match(/From:\s*(.+)/m)?.[1] || '';
+    const senderMatch = matchSenderDomain(fromHeader);
+    const priceMatch = body.text.match(/\$\s*(\d+\.?\d{0,2})\s*(?:\/|per\s+)?\s*(?:month|mo|year|yr|annual)/i);
+    const anyAmt = body.text.match(/(?:amount|total|charged|paid|fee|price|cost)\D*\$?\s*(\d+\.?\d{0,2})/i)
+      || body.text.match(/\$\s?(\d+\.?\d{0,2})/);
+
+    if (senderMatch) {
+      const amt = priceMatch ? parseFloat(priceMatch[1]) : (anyAmt ? parseFloat(anyAmt[1]) : 0);
+      const cycle = body.text.match(/year|annual/i) ? 'yearly' as const : 'monthly' as const;
+      quickResults.push({
+        name: senderMatch, amount: amt, cycle,
+        confidence: amt > 0 ? 'high' : 'medium',
+        isTrial: /trial|try it free/i.test(body.text),
+        trialEnd: body.trialEnd || '',
+        source: fromHeader,
+      });
+      continue;
+    }
+
+    // Layer 2: Regex pattern matching
     const q = quickRegexExtract(body.text);
     if (q) {
       if (body.trialEnd) { q.isTrial = true; q.trialEnd = body.trialEnd; q.confidence = "medium"; }
@@ -534,6 +609,54 @@ export default function AppPage() {
     }
   }, []);
 
+  // ── V2: Auto background scan on app open ──
+  useEffect(() => {
+    if (!mounted) return;
+    const lastScanKey = "oopssubs_last_autoscan";
+    const lastScan = localStorage.getItem(lastScanKey);
+    const now = Date.now();
+    // Only auto-scan if last scan was > 2 hours ago
+    if (lastScan && now - parseInt(lastScan) < 7200000) return;
+    const token = getStoredToken();
+    if (!token) return;
+
+    const doBackgroundScan = async () => {
+      try {
+        await initGapiClient(token);
+        const query = '("free trial" OR "trial ends" OR "welcome to" OR "subscription confirmed" OR "you\'re subscribed") newer_than:14d';
+        const res = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=10`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data = await res.json();
+        const messages = data.messages || [];
+        if (messages.length === 0) return;
+
+        const newBodies: { text: string; trialEnd: string }[] = [];
+        for (const msg of messages.slice(0, 5)) {
+          const body = await getEmailBody(token, msg.id);
+          if (body.text) newBodies.push(body);
+        }
+        if (newBodies.length === 0) return;
+
+        const extracted = dedupeSubs(await extractSubsWithAI(newBodies));
+        // Filter: only show subscriptions not already tracked
+        const knownNames = new Set(subs.map(s => s.name.toLowerCase().replace(/[^a-z0-9]/g, '')));
+        const trulyNew = extracted.filter(e => {
+          const key = e.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return !knownNames.has(key) && e.name.length > 2 && !/subscription|unknown/i.test(e.name);
+        });
+
+        if (trulyNew.length > 0) {
+          setScannedItems(dedupeSubs(trulyNew));
+        }
+      } catch {}
+      localStorage.setItem(lastScanKey, String(now));
+    };
+
+    doBackgroundScan();
+  }, [mounted, subs.length]);
+
   useEffect(() => {
     if (!mounted || subs.length === 0) return;
     subs.forEach((sub) => {
@@ -644,6 +767,8 @@ export default function AppPage() {
   }, []);
 
   const monthTotal = totalMonthly(subs);
+  const urgentSubs = subs.filter(s => daysUntil(s.nextDate) === 1);
+  const [dismissedUrgent, setDismissedUrgent] = useState<string[]>([]);
 
   if (!mounted) return null;
 
@@ -651,6 +776,30 @@ export default function AppPage() {
     <>
       <Script src="https://apis.google.com/js/api.js" />
       <Script src="https://accounts.google.com/gsi/client" />
+
+      {/* Renewal alert banner */}
+      {urgentSubs.filter(s => !dismissedUrgent.includes(s.id)).map(s => (
+        <motion.div
+          key={s.id}
+          initial={{ y: -60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-[#1d1d1f] text-white px-6 py-5 animate-slide-down"
+        >
+          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] text-white/60 mb-0.5">Renews tomorrow</p>
+              <p className="text-[17px] font-semibold truncate">{s.name} · {fmtCurrency(s.amount)}</p>
+            </div>
+            <a
+              href={`/cancel/${s.name.toLowerCase().replace(/\s+/g, '-')}`}
+              className="flex-shrink-0 bg-white text-[#1d1d1f] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform"
+            >
+              Cancel now
+            </a>
+            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-white/40 hover:text-white text-lg">&times;</button>
+          </div>
+        </motion.div>
+      ))}
 
       <main className="min-h-screen max-w-md mx-auto px-6 py-8 animate-fade-in">
         {/* Nav */}

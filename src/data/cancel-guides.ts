@@ -6,6 +6,7 @@ export interface CancelGuide {
   directLink?: string;
   warning?: string;
   citation?: string;
+  cancelEmail?: { to: string; subject: string; body: string };
 }
 
 export const cancelGuides: CancelGuide[] = [
@@ -99,6 +100,7 @@ export const cancelGuides: CancelGuide[] = [
     slug: 'nytimes',
     name: 'New York Times',
     difficulty: 'hard',
+    cancelEmail: { to: 'customercare@nytimes.com', subject: 'Cancellation Request - [Your Account Email]', body: 'Hello,\n\nI would like to cancel my New York Times subscription, effective immediately. Please confirm the cancellation and that no further charges will be made.\n\nMy account email: [your email]\n\nThank you.' },
     steps: ['Online cancel may not be available depending on your plan.', 'Try: nytimes.com/account → Subscription → Cancel', 'If not available: call 866-273-3612', 'Or use the chat feature on the contact page', 'Be prepared: they will try hard to keep you. Stay firm.'],
     warning: 'NYT makes cancellation intentionally difficult. Phone may be required.',
   },
@@ -106,6 +108,7 @@ export const cancelGuides: CancelGuide[] = [
     slug: 'planet-fitness',
     name: 'Planet Fitness',
     difficulty: 'hard',
+    cancelEmail: { to: '[your club email]', subject: 'Membership Cancellation - [Your Name] - [Membership ID]', body: 'Hello,\n\nI am writing to cancel my Planet Fitness membership, effective immediately. My membership details are below.\n\nName: [your name]\nMembership ID: [your ID]\n\nPlease confirm the cancellation in writing and that no further charges will be made.\n\nThank you.' },
     steps: ['Go to your home club IN PERSON', 'Fill out a cancellation form at the front desk', 'OR send certified mail with your name, ID, and cancellation request', 'Some locations: try planetfitness.com/login'],
     warning: 'Most locations still require in-person or certified mail cancellation. Yes, in 2026.',
   },
@@ -173,7 +176,7 @@ export const cancelGuides: CancelGuide[] = [
   { slug: 'twitch-sub', name: 'Twitch Subscriptions', difficulty: 'medium', steps: ['Go to twitch.tv/subscriptions', 'Click the sub you want to cancel', 'Click "Cancel Subscription"', 'Repeat for each sub. No bulk cancel.'], warning: 'Each subscription must be canceled individually. No bulk option.' },
   // ── Music & audio ──
   { slug: 'pandora-plus', name: 'Pandora Plus/Premium', difficulty: 'easy', directLink: 'https://www.pandora.com/account', steps: ['Go to pandora.com/account', 'Click "Cancel Subscription"', 'Confirm'] },
-  { slug: 'siriusxm', name: 'SiriusXM', difficulty: 'hard', steps: ['Call 1-866-635-5027', 'Tell them you want to cancel', 'They will try HARD to keep you. Stay firm.', 'You CANNOT cancel online. Phone only.'], warning: 'SiriusXM requires a phone call to cancel. They are notorious for aggressive retention tactics.' },
+  { slug: 'siriusxm', name: 'SiriusXM', difficulty: 'hard', cancelEmail: { to: 'siriusxm@siriusxm.com', subject: 'Cancellation Request - [Your Account #]', body: 'I wish to cancel my SiriusXM subscription immediately. Please confirm that no further charges will be made. Account #: [your ID]' }, steps: ['Call 1-866-635-5027', 'Tell them you want to cancel', 'They will try HARD to keep you. Stay firm.', 'You CANNOT cancel online. Phone only.'], warning: 'SiriusXM requires a phone call to cancel. They are notorious for aggressive retention tactics.' },
   { slug: 'tidal', name: 'Tidal', difficulty: 'easy', steps: ['Go to tidal.com/account', 'Click "Cancel Subscription"', 'Confirm'] },
   // ── Software & productivity ──
   { slug: 'microsoft-365', name: 'Microsoft 365', difficulty: 'easy', directLink: 'https://account.microsoft.com/services', steps: ['Go to account.microsoft.com/services', 'Find Microsoft 365', 'Click "Manage" → "Cancel"', 'Confirm'], warning: 'You\'ll lose access to Office apps. Files stay in OneDrive (free tier).' },
@@ -183,8 +186,8 @@ export const cancelGuides: CancelGuide[] = [
   { slug: 'evernote', name: 'Evernote', difficulty: 'easy', steps: ['Go to evernote.com/account/billing', 'Click "Cancel Subscription"', 'Confirm'] },
   { slug: 'canva-pro', name: 'Canva Pro', difficulty: 'easy', steps: ['Go to canva.com/settings/billing', 'Click "Cancel Subscription"', 'Confirm'] },
   { slug: 'grammarly-premium', name: 'Grammarly Premium', difficulty: 'easy', steps: ['Go to grammarly.com/account/subscription', 'Click "Cancel Subscription"', 'Confirm'] },
-  { slug: 'norton-antivirus', name: 'Norton Antivirus', difficulty: 'hard', steps: ['Go to my.norton.com/account', 'Find your subscription', 'Click "Cancel"', 'Norton may require a phone call for some plans.'], warning: 'Some Norton plans require phone cancellation. They use aggressive retention scripts.' },
-  { slug: 'mcafee', name: 'McAfee', difficulty: 'hard', steps: ['Go to myaccount.mcafee.com', 'Find your subscription', 'Click "Cancel"', 'Some plans require phone: 1-866-622-3911'], warning: 'May require phone call. They will offer discounts to stay.' },
+  { slug: 'norton-antivirus', name: 'Norton Antivirus', difficulty: 'hard', cancelEmail: { to: 'siriusxm@siriusxm.com', subject: 'Cancellation Request - [Your Account #]', body: 'I wish to cancel my SiriusXM subscription immediately. Please confirm that no further charges will be made. Account #: [your ID]' }, steps: ['Go to my.norton.com/account', 'Find your subscription', 'Click "Cancel"', 'Norton may require a phone call for some plans.'], warning: 'Some Norton plans require phone cancellation. They use aggressive retention scripts.' },
+  { slug: 'mcafee', name: 'McAfee', difficulty: 'hard', cancelEmail: { to: 'siriusxm@siriusxm.com', subject: 'Cancellation Request - [Your Account #]', body: 'I wish to cancel my SiriusXM subscription immediately. Please confirm that no further charges will be made. Account #: [your ID]' }, steps: ['Go to myaccount.mcafee.com', 'Find your subscription', 'Click "Cancel"', 'Some plans require phone: 1-866-622-3911'], warning: 'May require phone call. They will offer discounts to stay.' },
   { slug: 'lastpass', name: 'LastPass Premium', difficulty: 'easy', steps: ['Go to lastpass.com/account', 'Click "Cancel Subscription"', 'Confirm'] },
   { slug: '1password', name: '1Password', difficulty: 'easy', steps: ['Go to 1password.com/account', 'Click "Cancel Subscription"', 'Confirm'] },
   // ── Food & delivery ──
@@ -204,14 +207,14 @@ export const cancelGuides: CancelGuide[] = [
   // ── Dating ──
   { slug: 'bumble', name: 'Bumble Boost/Premium', difficulty: 'medium', steps: ['iPhone: Settings → Apple ID → Subscriptions → Bumble → Cancel', 'Android: Play Store → Subscriptions → Bumble → Cancel'], warning: 'Deleting the app does NOT cancel. Must cancel through app store.' },
   { slug: 'hinge', name: 'Hinge Preferred', difficulty: 'medium', steps: ['iPhone: Settings → Apple ID → Subscriptions → Hinge → Cancel', 'Android: Play Store → Subscriptions → Hinge → Cancel'], warning: 'Deleting the app does NOT cancel.' },
-  { slug: 'match', name: 'Match.com', difficulty: 'hard', steps: ['Go to match.com/settings', 'Click "Manage Subscription"', 'Click "Cancel"', 'Match may require you to confirm multiple times'], warning: 'Match auto-renews. Cancel at least 24 hours before renewal.' },
+  { slug: 'match', name: 'Match.com', difficulty: 'hard', cancelEmail: { to: 'siriusxm@siriusxm.com', subject: 'Cancellation Request - [Your Account #]', body: 'I wish to cancel my SiriusXM subscription immediately. Please confirm that no further charges will be made. Account #: [your ID]' }, steps: ['Go to match.com/settings', 'Click "Manage Subscription"', 'Click "Cancel"', 'Match may require you to confirm multiple times'], warning: 'Match auto-renews. Cancel at least 24 hours before renewal.' },
   // ── Gaming ──
   { slug: 'xbox-game-pass', name: 'Xbox Game Pass', difficulty: 'easy', directLink: 'https://account.microsoft.com/services', steps: ['Go to account.microsoft.com/services', 'Find Xbox Game Pass', 'Click "Manage" → "Cancel"', 'Confirm'] },
   { slug: 'playstation-plus', name: 'PlayStation Plus', difficulty: 'easy', directLink: 'https://www.playstation.com/en-us/playstation-network/management/', steps: ['Go to playstation.com → Account → Subscriptions', 'Find PS Plus', 'Click "Cancel Subscription"', 'Confirm'] },
   { slug: 'nintendo-online', name: 'Nintendo Switch Online', difficulty: 'easy', steps: ['Go to accounts.nintendo.com', 'Shop Menu → Nintendo Switch Online → Cancel', 'Confirm'], warning: 'Cloud save backups are deleted after canceling.' },
   { slug: 'ea-play', name: 'EA Play', difficulty: 'easy', steps: ['Go to ea.com/account', 'Find EA Play subscription', 'Click "Cancel"', 'Confirm'] },
   // ── News & media ──
-  { slug: 'wall-street-journal', name: 'Wall Street Journal', difficulty: 'hard', steps: ['Call 1-800-568-7625', 'Tell them you want to cancel', 'They will try retention — stay firm', 'Some plans allow online cancel: wsj.com/account'], warning: 'WSJ often requires a phone call. Online cancel is not available for all plans.' },
+  { slug: 'wall-street-journal', name: 'Wall Street Journal', difficulty: 'hard', cancelEmail: { to: 'siriusxm@siriusxm.com', subject: 'Cancellation Request - [Your Account #]', body: 'I wish to cancel my SiriusXM subscription immediately. Please confirm that no further charges will be made. Account #: [your ID]' }, steps: ['Call 1-800-568-7625', 'Tell them you want to cancel', 'They will try retention — stay firm', 'Some plans allow online cancel: wsj.com/account'], warning: 'WSJ often requires a phone call. Online cancel is not available for all plans.' },
   { slug: 'washington-post', name: 'Washington Post', difficulty: 'medium', steps: ['Go to washingtonpost.com/myaccount', 'Click "Cancel Subscription"', 'They will offer a discount — skip it', 'Confirm'] },
   { slug: 'the-atlantic', name: 'The Atlantic', difficulty: 'easy', steps: ['Go to theatlantic.com/account', 'Click "Cancel Subscription"', 'Confirm'] },
   { slug: 'substack', name: 'Substack Newsletters', difficulty: 'medium', steps: ['Go to substack.com/account', 'Find the newsletter', 'Click "Cancel Subscription"', 'Repeat for each one. No bulk cancel.'], warning: 'Each newsletter is a separate subscription. Cancel them individually.' },
