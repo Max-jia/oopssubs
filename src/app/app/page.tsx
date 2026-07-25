@@ -40,7 +40,37 @@ interface ScannedSub {
 /* ── Helpers ── */
 const STORAGE_KEY = "oopssubs_subs";
 const TOKEN_KEY = "oopssubs_gmail_token";
+const PENDING_CANCEL_KEY = "oopssubs_pending_cancel";
+const CANCELLED_KEY = "oopssubs_cancelled";
+
+interface CancelledSub { name: string; amount: number; cycle: string; date: string; }
+function getCancelled(): CancelledSub[] {
+  try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || '[]'); }
+  catch { return []; }
+}
+function addCancelled(sub: Subscription) {
+  const all = getCancelled();
+  all.push({ name: sub.name, amount: sub.amount, cycle: sub.cycle, date: new Date().toISOString() });
+  localStorage.setItem(CANCELLED_KEY, JSON.stringify(all));
+}
+function lifetimeSavings(): number {
+  return getCancelled().reduce((sum, c) => sum + (c.cycle === 'yearly' ? c.amount : c.amount * 12), 0);
+}
 const DEEPSEEK_KEY = process.env.NEXT_PUBLIC_DEEPSEEK_KEY || "";
+
+interface PendingCancel { subId: string; name: string; timestamp: number; }
+function getPendingCancels(): PendingCancel[] {
+  try { return JSON.parse(localStorage.getItem(PENDING_CANCEL_KEY) || '[]'); }
+  catch { return []; }
+}
+function savePendingCancel(pc: PendingCancel) {
+  const all = getPendingCancels().filter(p => p.subId !== pc.subId);
+  all.push(pc);
+  localStorage.setItem(PENDING_CANCEL_KEY, JSON.stringify(all));
+}
+function clearPendingCancel(subId: string) {
+  localStorage.setItem(PENDING_CANCEL_KEY, JSON.stringify(getPendingCancels().filter(p => p.subId !== subId)));
+}
 
 function uuid() { return crypto.randomUUID(); }
 function loadSubs(): Subscription[] {
@@ -572,8 +602,32 @@ export default function AppPage() {
   const [form, setForm] = useState({ name: "", amount: "", cycle: "monthly" as const, nextDate: "" });
   const [mounted, setMounted] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
+  const [followUpCancel, setFollowUpCancel] = useState<PendingCancel | null>(null);
+  const [celebration, setCelebration] = useState<CancelledSub | null>(null);
+  const [showWeekly, setShowWeekly] = useState(false);
 
-  useEffect(() => { setSubs(loadSubs()); setMounted(true); }, []);
+  useEffect(() => {
+    setSubs(loadSubs());
+    // Check for pending cancel follow-ups
+    const pending = getPendingCancels();
+    const subs = loadSubs();
+    for (const pc of pending) {
+      if (Date.now() - pc.timestamp > 3600000 && subs.some(s => s.id === pc.subId)) {
+        setFollowUpCancel(pc);
+        break;
+      }
+    }
+    setMounted(true);
+  }, []);
+
+  // Weekly checkup
+  useEffect(() => {
+    if (!mounted || subs.length < 2) return;
+    const lastWeekly = localStorage.getItem("oopssubs_weekly_check");
+    if (!lastWeekly || Date.now() - parseInt(lastWeekly) > 604800000) {
+      setShowWeekly(true);
+    }
+  }, [mounted, subs.length]);
 
   // Wait for Google API scripts to fully load
   useEffect(() => {
@@ -680,8 +734,11 @@ export default function AppPage() {
   }, [form, subs]);
 
   const deleteSub = useCallback((id: string) => {
+    const deleted = subs.find(s => s.id === id);
+    if (deleted) addCancelled(deleted);
     const updated = subs.filter((s) => s.id !== id);
     setSubs(updated); saveSubs(updated);
+    if (deleted) { setCelebration({ name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString() }); setTimeout(() => setCelebration(null), 5000); }
   }, [subs]);
 
   const handleAppStoreScan = useCallback(async () => {
@@ -790,18 +847,95 @@ export default function AppPage() {
               <p className="text-[13px] text-white/60 mb-0.5">Renews tomorrow</p>
               <p className="text-[17px] font-semibold truncate">{s.name} · {fmtCurrency(s.amount)}</p>
             </div>
-            <a
-              href={`/cancel/${s.name.toLowerCase().replace(/\s+/g, '-')}`}
-              className="flex-shrink-0 bg-white text-[#1d1d1f] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform"
+            <button
+              onClick={() => {
+                savePendingCancel({ subId: s.id, name: s.name, timestamp: Date.now() });
+                window.open(`/cancel/${s.name.toLowerCase().replace(/\s+/g, '-')}`, '_blank');
+              }}
+              className="flex-shrink-0 bg-white text-[#1d1d1f] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
               Cancel now
-            </a>
+            </button>
             <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-white/40 hover:text-white text-lg">&times;</button>
           </div>
         </motion.div>
       ))}
 
+      {/* Cancel confirmation follow-up */}
+      {followUpCancel && (
+        <motion.div
+          initial={{ y: -60, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-[#fff3e0] px-6 py-5"
+        >
+          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+            <p className="text-[14px] font-medium text-[#e65100]">
+              Did you cancel {followUpCancel.name}?
+            </p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => {
+                  deleteSub(followUpCancel.subId);
+                  clearPendingCancel(followUpCancel.subId);
+                  setFollowUpCancel(null);
+                }}
+                className="bg-[#e65100] text-white text-[13px] font-semibold px-3 py-1.5 rounded-full active:scale-95"
+              >
+                Yes, done
+              </button>
+              <button
+                onClick={() => {
+                  clearPendingCancel(followUpCancel.subId);
+                  setFollowUpCancel(null);
+                }}
+                className="text-[#e65100] text-[13px] px-3 py-1.5 rounded-full active:scale-95"
+              >
+                Not yet
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <main className="min-h-screen max-w-md mx-auto px-6 py-8 animate-fade-in">
+        {/* Lifetime savings */}
+        {lifetimeSavings() > 0 && (
+          <div className="text-center mb-8">
+            <p className="text-[12px] text-[#86868b] uppercase tracking-[0.05em]">Lifetime saved</p>
+            <p className="text-[28px] font-extrabold tracking-[-0.02em] text-[#2e7d32]">{fmtCurrency(lifetimeSavings())}</p>
+            <button
+              onClick={() => {
+                const cancelled = getCancelled().slice(-5).map(c => `${c.name} ${fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr`).join(', ');
+                const text = `I found ${fmtCurrency(lifetimeSavings())}/year in forgotten subscriptions using OopsSubs.\nMy cancelled: ${cancelled}\nCheck yours → oopssubs.com`;
+                navigator.clipboard.writeText(text).then(() => alert('Copied! Share anywhere.'));
+              }}
+              className="text-[12px] text-[#86868b] underline hover:text-[#1d1d1f] mt-1"
+            >
+              Share your savings
+            </button>
+          </div>
+        )}
+
+        {/* Celebration toast */}
+        <AnimatePresence>
+          {celebration && (
+            <motion.div
+              initial={{ y: -50, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -50, opacity: 0 }}
+              className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[#1d1d1f] text-white rounded-3xl px-6 py-5 shadow-2xl flex items-center gap-4"
+            >
+              <span className="text-[32px]">🎉</span>
+              <div className="flex-1">
+                <p className="text-[14px] font-semibold">Cancelled {celebration.name}!</p>
+                <p className="text-[13px] text-white/60">
+                  You just saved {fmtCurrency(celebration.cycle === 'yearly' ? celebration.amount : celebration.amount * 12)}/year
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Nav */}
         <div className="flex items-center justify-between mb-10">
           <Link href="/" className="nav-link inline-flex items-center gap-1">
@@ -933,6 +1067,30 @@ export default function AppPage() {
         {/* List */}
         {subs.length > 0 && (
           <div className="animate-slide-down">
+            {/* Weekly checkup banner */}
+            <AnimatePresence>
+              {showWeekly && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="card bg-[#f0fdf4] mb-6"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Weekly subscription checkup</p>
+                      <p className="text-[13px] text-[#86868b] leading-relaxed">
+                        You have {subs.length} active subscriptions totaling {fmtCurrency(monthTotal)}/mo. Still need all of them?
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setShowWeekly(false); localStorage.setItem("oopssubs_weekly_check", String(Date.now())); }}
+                      className="flex-shrink-0 text-[#86868b] hover:text-[#1d1d1f] text-lg"
+                    >&times;</button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Your subscriptions</h2>
               <button onClick={handleGmailScan} disabled={scanning} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] font-medium transition-colors">Scan again</button>
