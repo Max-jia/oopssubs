@@ -242,7 +242,7 @@ function matchSenderDomain(fromHeader: string): string | null {
     'apple': 'Apple', 'linkedin': 'LinkedIn', 'microsoft': 'Microsoft',
     'dropbox': 'Dropbox', 'notion': 'Notion', 'evernote': 'Evernote',
     'nytimes': 'NYT', 'wsj': 'WSJ', 'washingtonpost': 'Washington Post',
-    'spotify': 'Spotify', 'tinder': 'Tinder', 'bumble': 'Bumble', 'hinge': 'Hinge',
+    'tinder': 'Tinder', 'bumble': 'Bumble', 'hinge': 'Hinge',
     'doordash': 'DoorDash', 'ubereats': 'Uber', 'instacart': 'Instacart',
     'peloton': 'Peloton', 'calm': 'Calm', 'headspace': 'Headspace',
     'hellofresh': 'HelloFresh', 'blueapron': 'Blue Apron', 'chegg': 'Chegg',
