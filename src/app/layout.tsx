@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
   title: "OopsSubs — Find & Cancel Forgotten Subscriptions",
@@ -31,7 +32,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
     </html>
   );
 }

@@ -1,0 +1,9 @@
+{
+  "appId": "com.oopssubs.app",
+  "appName": "OopsSubs",
+  "webDir": "out",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": ["oopssubs.com", "accounts.google.com"]
+  }
+}
