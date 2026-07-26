@@ -45,9 +45,9 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
-        <p className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4">
+        <h1 className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4">
           OopsSubs
-        </p>
+        </h1>
         <motion.h1
           className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"
           initial={{ y: 16 }}
@@ -57,7 +57,7 @@ export default function HomePage() {
           Stop bleeding<br />on subscriptions
         </motion.h1>
         <p className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto">
-          OopsSubs finds every subscription hidden in your email, reminds you before you&apos;re charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services.
+          OopsSubs is a subscription management application. OopsSubs helps users find and cancel forgotten subscriptions by scanning their email inbox for receipts, renewal notices, and free trials.
         </p>
         <motion.p
           className="text-[13px] text-[#aeaeb2] mb-10 max-w-xs mx-auto"
