@@ -45,30 +45,20 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
-        <motion.p
-          className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
+        <p className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4">
           OopsSubs
-        </motion.p>
+        </p>
         <motion.h1
           className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          initial={{ y: 16 }}
+          animate={{ y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
         >
           Stop bleeding<br />on subscriptions
         </motion.h1>
-        <motion.p
-          className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45, duration: 0.5 }}
-        >
+        <p className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto">
           OopsSubs finds every subscription hidden in your email, reminds you before you&apos;re charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services.
-        </motion.p>
+        </p>
         <motion.p
           className="text-[13px] text-[#aeaeb2] mb-10 max-w-xs mx-auto"
           initial={{ opacity: 0 }}
