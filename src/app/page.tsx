@@ -46,7 +46,7 @@ export default function HomePage() {
           />
         </motion.div>
         <motion.p
-          className="text-[14px] font-semibold text-[#86868b] uppercase tracking-[0.1em] mb-4"
+          className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
