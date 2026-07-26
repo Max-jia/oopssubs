@@ -1050,9 +1050,14 @@ export default function AppPage() {
 
         {/* Error */}
         {error && !scanning && (
-          <div className="card bg-[#ffebee] border-[#ffcdd2] mb-6 text-[14px] text-[#c62828] flex items-start gap-3">
-            <span className="flex-1">{error}</span>
-            <button onClick={() => setError("")} className="text-[13px] font-medium underline flex-shrink-0">Dismiss</button>
+          <div className="card bg-[#ffebee] border-[#ffcdd2] mb-6 text-[14px] text-[#c62828]">
+            <p className="mb-2">{error}</p>
+            <div className="flex gap-2">
+              {/re-authorize|Session expired/i.test(error) && (
+                <button onClick={handleGmailScan} className="bg-[#c62828] text-white text-[13px] font-medium px-4 py-2 rounded-full active:scale-95 transition-transform">Reconnect Gmail</button>
+              )}
+              <button onClick={() => setError("")} className="text-[13px] font-medium underline">Dismiss</button>
+            </div>
           </div>
         )}
 
