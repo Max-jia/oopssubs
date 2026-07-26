@@ -62,7 +62,7 @@ export default function PricingPage() {
         <div className="card text-center text-[13px] text-[#86868b] space-y-2">
           <p>🔒 Secure payment via Stripe</p>
           <p>💾 Your data stays on your device, always</p>
-          <p>↩️ 7-day refund if it doesn&apos;t work for you</p>
+          <p>↩️ 7-day refund if it doesn&apos;t work for you. Email jiayongchun001@gmail.com</p>
         </div>
       </motion.div>
     </main>
