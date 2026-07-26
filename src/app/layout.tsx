@@ -4,7 +4,6 @@ import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
   title: "OopsSubs — Find & Cancel Forgotten Subscriptions",
-  applicationName: "OopsSubs",
   description: "Connect your Gmail, discover every subscription you're paying for, and cancel what you don't need. No bank login. No server. Your data stays on your device.",
   manifest: "/manifest.json",
   icons: {
