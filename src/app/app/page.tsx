@@ -787,8 +787,11 @@ export default function AppPage() {
     const timeout = setTimeout(() => { setError("Scan is taking longer than expected. Results may still appear."); setScanning(false); }, 90000);
     try {
       await gapiInit(); const oauth2 = await gisInit();
+      const redirectUri = window.location.origin + "/app";
       const tokenClient = oauth2.initTokenClient({
         client_id: CLIENT_ID, scope: GMAIL_SCOPES,
+        ux_mode: "redirect",
+        redirect_uri: redirectUri,
         callback: async (resp: any) => {
           if (resp.error) { setError("Gmail access denied."); clearTimeout(timeout); scanningRef.current = false; setScanning(false); setScanStatus(""); return; }
           const token = resp.access_token;
