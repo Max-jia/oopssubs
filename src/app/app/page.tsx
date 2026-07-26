@@ -635,6 +635,34 @@ export default function AppPage() {
       window.history.replaceState({}, "", "/app");
     }
     setPro(isPro());
+    // Handle OAuth redirect callback (token in URL hash)
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.slice(1));
+      const token = params.get("access_token");
+      const state = params.get("state");
+      if (token && state === "scan") {
+        localStorage.setItem(TOKEN_KEY, token);
+        window.location.hash = "";
+        // Trigger scan with the new token
+        setTimeout(async () => {
+          try {
+            await initGapiClient(token);
+            setScanning(true); setScanStatus("Searching inbox...");
+            const messages = await searchSubscriptionEmails(token);
+            if (messages.length === 0) { setScannedItems([]); setError("No subscription-related emails found in the last 2 years. Try adding manually."); setScanning(false); return; }
+            setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+            const bodies: { text: string; trialEnd: string }[] = [];
+            for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
+            const dedupedBodies = dedupeBodiesBySender(bodies);
+            setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+            const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
+            if (extracted.length === 0) setError(`AI analyzed ${bodies.length} emails but found no subscriptions.`);
+            setScannedItems(extracted); setScanning(false); setScanStatus("");
+          } catch { setScanning(false); setError("Scan failed. Please try again."); }
+        }, 500);
+      }
+    }
     // Check for pending cancel follow-ups
     const pending = getPendingCancels();
     const subs = loadSubs();
@@ -787,30 +815,23 @@ export default function AppPage() {
     const timeout = setTimeout(() => { setError("Scan is taking longer than expected. Results may still appear."); setScanning(false); }, 90000);
     try {
       await gapiInit(); const oauth2 = await gisInit();
-      const redirectUri = window.location.origin + "/app";
-      const tokenClient = oauth2.initTokenClient({
-        client_id: CLIENT_ID, scope: GMAIL_SCOPES,
-        ux_mode: "redirect",
-        redirect_uri: redirectUri,
-        callback: async (resp: any) => {
-          if (resp.error) { setError("Gmail access denied."); clearTimeout(timeout); scanningRef.current = false; setScanning(false); setScanStatus(""); return; }
-          const token = resp.access_token;
-          localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
-          setScanStatus("Searching inbox...");
-          const messages = await searchSubscriptionEmails(token);
-          if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); clearTimeout(timeout); scanningRef.current = false; setScanning(false); setScanStatus(""); return; }
-          setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
-          const bodies: { text: string; trialEnd: string }[] = [];
-          for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
-          const dedupedBodies = dedupeBodiesBySender(bodies);
-          setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
-          const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
-          if (extracted.length === 0) {
-            setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually or check if your subscription emails are in a different folder.`);
-          }
-          scanningRef.current = false; clearTimeout(timeout); setScannedItems(extracted); setScanning(false); setScanStatus("");
-        },
-      });
+      const doScan = async (token: string) => {
+        localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
+        setScanStatus("Searching inbox...");
+        const messages = await searchSubscriptionEmails(token);
+        if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); clearTimeout(timeout); scanningRef.current = false; setScanning(false); setScanStatus(""); return; }
+        setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+        const bodies: { text: string; trialEnd: string }[] = [];
+        for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
+        const dedupedBodies = dedupeBodiesBySender(bodies);
+        setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+        const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
+        if (extracted.length === 0) {
+          setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually or check if your subscription emails are in a different folder.`);
+        }
+        scanningRef.current = false; clearTimeout(timeout); setScannedItems(extracted); setScanning(false); setScanStatus("");
+      };
+
       const stored = getStoredToken();
       if (stored) {
         try {
@@ -842,7 +863,15 @@ export default function AppPage() {
           setScanStatus("");
         }
       }
-      tokenClient.requestAccessToken();
+      // Direct OAuth redirect (works in PWA standalone mode where popups are blocked)
+      const redirectUri = window.location.origin + "/app";
+      const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+        "client_id=" + encodeURIComponent(CLIENT_ID) +
+        "&redirect_uri=" + encodeURIComponent(redirectUri) +
+        "&response_type=token" +
+        "&scope=" + encodeURIComponent(GMAIL_SCOPES) +
+        "&state=scan&prompt=consent";
+      window.location.href = authUrl;
     } catch (e: any) { scanningRef.current = false; clearTimeout(timeout); setError(e.message || "Connection failed."); setScanning(false); }
   }, []);
 
