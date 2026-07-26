@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="google-site-verification" content="jmpxSu1KV3rIi-yl8ILBCDazEhpl9MI1jjiy5aZEF0g" />
       </head>
       <body>
-        <header style={{ padding: "12px 24px", fontSize: "14px", color: "#666", borderBottom: "1px solid #eee", fontFamily: "sans-serif" }}>
+        <header style={{ position:"absolute",width:"1px",height:"1px",overflow:"hidden",clip:"rect(0,0,0,0)",whiteSpace:"nowrap" }}>
           <strong>OopsSubs</strong> — Subscription manager. OopsSubs helps you find and cancel forgotten subscriptions.
         </header>
         <ClientLayout>{children}</ClientLayout>

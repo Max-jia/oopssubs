@@ -150,6 +150,7 @@ export default function HomePage() {
       <div className="max-w-md mx-auto px-6 pb-10 text-center">
         <p className="text-[13px] text-[#86868b] mb-2">OopsSubs — Find &amp; cancel forgotten subscriptions</p>
         <div className="space-x-4">
+          <Link href="/pricing" className="nav-link">Pro</Link>
           <Link href="/privacy" className="nav-link">Privacy</Link>
           <Link href="/terms" className="nav-link">Terms</Link>
           <Link href="/cancel" className="nav-link">All guides</Link>
