@@ -626,6 +626,7 @@ export default function AppPage() {
   const [showWeekly, setShowWeekly] = useState(false);
   const [pro, setPro] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showTrustModal, setShowTrustModal] = useState(false);
 
   useEffect(() => {
     setSubs(loadSubs());
@@ -863,15 +864,8 @@ export default function AppPage() {
           setScanStatus("");
         }
       }
-      // Direct OAuth redirect (works in PWA standalone mode where popups are blocked)
-      const redirectUri = window.location.origin + "/app";
-      const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
-        "client_id=" + encodeURIComponent(CLIENT_ID) +
-        "&redirect_uri=" + encodeURIComponent(redirectUri) +
-        "&response_type=token" +
-        "&scope=" + encodeURIComponent(GMAIL_SCOPES) +
-        "&state=scan&prompt=consent";
-      window.location.href = authUrl;
+      // Show trust modal first, then redirect
+      setShowTrustModal(true);
     } catch (e: any) { scanningRef.current = false; clearTimeout(timeout); setError(e.message || "Connection failed."); setScanning(false); }
   }, []);
 
@@ -1238,6 +1232,66 @@ export default function AppPage() {
                     <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount}>Add</button>
                   </div>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Trust modal — shown before Google OAuth redirect */}
+        <AnimatePresence>
+          {showTrustModal && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center">
+              <motion.div className="sheet-backdrop" onClick={() => setShowTrustModal(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div
+                className="sheet-content"
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-8 h-1 rounded-full bg-[#d2d2d7] mx-auto mb-5" />
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-[#1d1d1f]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+                  </div>
+                  <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-2">One quick thing</h3>
+                  <p className="text-[14px] text-[#86868b] leading-relaxed">
+                    Google shows an <strong className="text-[#1d1d1f]">"app not verified"</strong> warning for all new apps. This is normal — our verification is in progress.
+                  </p>
+                </div>
+                <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[#86868b]">
+                  <div className="flex gap-3">
+                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
+                    <span>OopsSubs only requests <strong className="text-[#1d1d1f]">read-only</strong> access. We cannot read, delete, or send emails.</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
+                    <span>Your email content is processed <strong className="text-[#1d1d1f]">locally in your browser</strong>. Nothing is uploaded to any server.</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
+                    <span>You can revoke access anytime at <strong className="text-[#1d1d1f]">myaccount.google.com/permissions</strong>.</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTrustModal(false);
+                    // Now do the actual redirect
+                    const redirectUri = window.location.origin + "/app";
+                    const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
+                      "client_id=" + encodeURIComponent(CLIENT_ID) +
+                      "&redirect_uri=" + encodeURIComponent(redirectUri) +
+                      "&response_type=token" +
+                      "&scope=" + encodeURIComponent(GMAIL_SCOPES) +
+                      "&state=scan&prompt=consent";
+                    window.location.href = authUrl;
+                  }}
+                  className="btn-primary w-full text-[17px] font-semibold py-4"
+                >
+                  I understand — continue
+                </button>
+                <button onClick={() => setShowTrustModal(false)} className="text-[13px] text-[#86868b] w-full text-center mt-3 py-2">Cancel</button>
               </motion.div>
             </div>
           )}
