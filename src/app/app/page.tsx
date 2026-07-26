@@ -258,7 +258,11 @@ const KNOWN_SERVICES: [RegExp, string, "monthly"|"yearly"][] = [
 
 /* ── V2: Sender domain matching against known services ── */
 function matchSenderDomain(fromHeader: string): string | null {
-  const domain = fromHeader.match(/@([a-z0-9-]+)\.(?:com|co|io|net|org|app|dev)/i)?.[1]?.toLowerCase();
+  // Extract domain: either "name@domain.com" format, or just "domain.com"
+  let domain = fromHeader.match(/@([a-z0-9-]+)\.(?:com|co|io|net|org|app|dev)/i)?.[1]?.toLowerCase();
+  if (!domain) {
+    domain = fromHeader.match(/([a-z0-9-]+)\.(?:com|co|io|net|org|app|dev)/i)?.[1]?.toLowerCase();
+  }
   if (!domain) return null;
   // Direct lookup in cancel guides
   for (const g of cancelGuides) {
@@ -312,7 +316,7 @@ function quickRegexExtract(text: string): ScannedSub | null {
         }
       }
       // Found service name but no clear amount
-      const anyAmt = text.match(/\$?\s?(\d{2,4}\.?\d{0,2})/);
+      const anyAmt = text.match(/\$?\s?(\d{1,4}\.?\d{0,2})/);
       if (anyAmt) {
         const amt = parseFloat(anyAmt[1]);
         if (amt >= 0.99 && amt <= 999) {
@@ -340,7 +344,7 @@ async function extractSubsWithAI(bodies: { text: string; trialEnd: string }[]): 
   const remaining: { text: string; trialEnd: string }[] = [];
   for (const body of bodies) {
     // Layer 1: Try sender domain matching (most reliable)
-    const fromHeader = body.text.match(/From:\s*.*?@([^\s\n]+)/i)?.[1] || body.text.match(/From:\s*(.+)/m)?.[1] || '';
+    const fromHeader = body.text.match(/From:\s*.*?@([^\s\n<>"]+)/i)?.[1] || body.text.match(/From:\s*(.+)/m)?.[1] || '';
     const senderMatch = matchSenderDomain(fromHeader);
     const priceMatch = body.text.match(/\$\s*(\d+\.?\d{0,2})\s*(?:\/|per\s+)?\s*(?:month|mo|year|yr|annual)/i);
     const anyAmt = body.text.match(/(?:amount|total|charged|paid|fee|price|cost)\D*\$?\s*(\d+\.?\d{0,2})/i)
