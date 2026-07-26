@@ -42,6 +42,11 @@ const STORAGE_KEY = "oopssubs_subs";
 const TOKEN_KEY = "oopssubs_gmail_token";
 const PENDING_CANCEL_KEY = "oopssubs_pending_cancel";
 const CANCELLED_KEY = "oopssubs_cancelled";
+const PRO_KEY = "oopssubs_pro";
+const FREE_LIMIT = 5;
+
+function isPro(): boolean { return localStorage.getItem(PRO_KEY) === "true"; }
+function unlockPro() { localStorage.setItem(PRO_KEY, "true"); }
 
 interface CancelledSub { name: string; amount: number; cycle: string; date: string; }
 function getCancelled(): CancelledSub[] {
@@ -612,9 +617,17 @@ export default function AppPage() {
   const [followUpCancel, setFollowUpCancel] = useState<PendingCancel | null>(null);
   const [celebration, setCelebration] = useState<CancelledSub | null>(null);
   const [showWeekly, setShowWeekly] = useState(false);
+  const [pro, setPro] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
     setSubs(loadSubs());
+    // Check PRO unlock via URL param
+    if (window.location.search.includes("pro=unlocked")) {
+      unlockPro(); setPro(true);
+      window.history.replaceState({}, "", "/app");
+    }
+    setPro(isPro());
     // Check for pending cancel follow-ups
     const pending = getPendingCancels();
     const subs = loadSubs();
@@ -730,6 +743,7 @@ export default function AppPage() {
 
   const addSub = useCallback(() => {
     if (!form.name || !form.amount) return;
+    if (!pro && subs.length >= FREE_LIMIT) { setShowPaywall(true); return; }
     const sub: Subscription = {
       id: uuid(), name: form.name.trim(), amount: parseFloat(form.amount),
       cycle: form.cycle, nextDate: form.nextDate || new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
@@ -738,7 +752,7 @@ export default function AppPage() {
     const updated = [...subs, sub];
     setSubs(updated); saveSubs(updated);
     setForm({ name: "", amount: "", cycle: "monthly", nextDate: "" }); setShowAdd(false);
-  }, [form, subs]);
+  }, [form, subs, pro]);
 
   const deleteSub = useCallback((id: string) => {
     const deleted = subs.find(s => s.id === id);
@@ -819,6 +833,7 @@ export default function AppPage() {
   }, []);
 
   const confirmScanned = useCallback((item: ScannedSub, idx: number) => {
+    if (!pro && subs.length >= FREE_LIMIT) { setShowPaywall(true); return; }
     const nextDate = item.trialEnd
       ? item.trialEnd
       : new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
@@ -954,9 +969,16 @@ export default function AppPage() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
             Home
           </Link>
-          <button onClick={() => setShowAdd(true)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
-            + Add
-          </button>
+          <div className="flex items-center gap-2">
+            {!pro && (
+              <span className="text-[12px] text-[#86868b]">{subs.length}/{FREE_LIMIT} free</span>
+            )}
+            {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
+            {pro && <span className="text-[12px] font-semibold text-[#2e7d32]">PRO</span>}
+            <button onClick={() => setShowAdd(true)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
+              + Add
+            </button>
+          </div>
         </div>
 
         {/* Total */}
@@ -1168,6 +1190,33 @@ export default function AppPage() {
                     <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount}>Add</button>
                   </div>
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Paywall modal */}
+        <AnimatePresence>
+          {showPaywall && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+              <motion.div className="sheet-backdrop" onClick={() => setShowPaywall(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div
+                className="relative bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <h3 className="text-[22px] font-extrabold tracking-[-0.02em] mb-2">You found {subs.length} subscriptions</h3>
+                <p className="text-[15px] text-[#86868b] mb-6">
+                  The free version tracks up to {FREE_LIMIT}. Unlock unlimited tracking and all Pro features.
+                </p>
+                <div className="text-center mb-6">
+                  <p className="text-[14px] text-[#86868b] line-through">$19.99</p>
+                  <p className="text-[36px] font-extrabold tracking-[-0.02em]">$9.99</p>
+                  <p className="text-[13px] text-[#86868b]">one-time · no subscription</p>
+                </div>
+                <a href="/pricing" className="btn-primary w-full mb-3">Get OopsSubs Pro</a>
+                <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[#86868b] w-full text-center">Maybe later</button>
               </motion.div>
             </div>
           )}
