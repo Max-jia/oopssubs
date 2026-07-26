@@ -471,14 +471,17 @@ ${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
 /* ── Step 4.5: Deduplicate by sender domain before AI, keep max 2 per sender ── */
 function dedupeBodiesBySender(bodies: { text: string; trialEnd: string }[]): { text: string; trialEnd: string }[] {
   const byDomain = new Map<string, { text: string; trialEnd: string }[]>();
+  const unknowns: { text: string; trialEnd: string }[] = [];
   for (const b of bodies) {
-    const match = b.text.match(/From:\s*.*?@([^\s\n>]+)/i);
-    const domain = match ? match[1].toLowerCase() : "unknown";
+    const match = b.text.match(/From:\s*.*?@([^\s\n<>"]+)/i);
+    const domain = match ? match[1].toLowerCase() : "";
+    if (!domain) { unknowns.push(b); continue; } // Don't group unknowns
     if (!byDomain.has(domain)) byDomain.set(domain, []);
     if (byDomain.get(domain)!.length < 3) byDomain.get(domain)!.push(b);
   }
   const result: { text: string; trialEnd: string }[] = [];
   byDomain.forEach((items) => result.push(...items));
+  result.push(...unknowns.slice(0, 10)); // Keep up to 10 unknown-sender emails
   return result;
 }
 
@@ -790,7 +793,7 @@ export default function AppPage() {
           if (messages.length === 0) {
             setScannedItems([]);
             setError("No subscription-related emails found in the last 2 years. Try adding manually.");
-            setScanning(false);
+            clearTimeout(timeout); setScanning(false); setScanStatus("");
             return;
           }
           setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
@@ -804,7 +807,12 @@ export default function AppPage() {
           }
           clearTimeout(timeout); setScannedItems(extracted); setScanning(false); setScanStatus("");
           return;
-        } catch {}
+        } catch {
+          clearTimeout(timeout);
+          setError("Session expired. Please re-authorize Gmail access.");
+          setScanning(false);
+          setScanStatus("");
+        }
       }
       tokenClient.requestAccessToken();
     } catch (e: any) { clearTimeout(timeout); setError(e.message || "Connection failed."); setScanning(false); }
