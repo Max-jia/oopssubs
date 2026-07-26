@@ -3,6 +3,20 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.oopssubs.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            storeFile file('../oopssubs.keystore')
+            storePassword 'oopssubs2026'
+            keyAlias 'oopssubs'
+            keyPassword 'oopssubs2026'
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
     defaultConfig {
         applicationId "com.oopssubs.app"
         minSdkVersion rootProject.ext.minSdkVersion

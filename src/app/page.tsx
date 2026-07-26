@@ -54,12 +54,20 @@ export default function HomePage() {
           Stop bleeding<br />on subscriptions
         </motion.h1>
         <motion.p
-          className="text-[17px] text-[#86868b] leading-relaxed mb-10 max-w-xs mx-auto"
+          className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45, duration: 0.5 }}
         >
-          Connect your email. See everything you&apos;re paying for. Cancel what you don&apos;t need. Nothing stored on a server.
+          OopsSubs finds every subscription hidden in your email, reminds you before you&apos;re charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services.
+        </motion.p>
+        <motion.p
+          className="text-[13px] text-[#aeaeb2] mb-10 max-w-xs mx-auto"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          🔒 No server. No database. Your data stays on your device.
         </motion.p>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
