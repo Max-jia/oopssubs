@@ -1277,7 +1277,7 @@ export default function AppPage() {
                 <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[#86868b]">
                   <div className="flex gap-3">
                     <span className="text-[#2e7d32] flex-shrink-0">✓</span>
-                    <span>OopsSubs only requests <strong className="text-[#1d1d1f]">read-only</strong> access. We cannot read, delete, or send emails.</span>
+                    <span>OopsSubs only looks for subscription receipts. We <strong className="text-[#1d1d1f]">cannot modify, delete, or send</strong> emails.</span>
                   </div>
                   <div className="flex gap-3">
                     <span className="text-[#2e7d32] flex-shrink-0">✓</span>
