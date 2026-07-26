@@ -1067,9 +1067,9 @@ export default function AppPage() {
                   initial={{ opacity: 0, y: 16, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: i * 0.08, type: "spring", stiffness: 400, damping: 22 }}
-                  className={`card flex items-center justify-between py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}
+                  className={`card flex items-center justify-between gap-3 py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}
                 >
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <div className="text-[15px] font-semibold">{item.name}</div>
                       {item.isTrial && (
