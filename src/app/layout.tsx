@@ -4,7 +4,7 @@ import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
   title: "OopsSubs — Find & Cancel Forgotten Subscriptions",
-  description: "Connect your Gmail, discover every subscription you're paying for, and cancel what you don't need. No bank login. No server. Your data stays on your device.",
+  description: "OopsSubs is a subscription manager. OopsSubs helps you find and cancel forgotten subscriptions. OopsSubs scans your Gmail to discover every subscription you're paying for, reminds you before renewal, and helps you cancel with step-by-step guides.",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon-32.png",
@@ -36,12 +36,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="google-site-verification" content="jmpxSu1KV3rIi-yl8ILBCDazEhpl9MI1jjiy5aZEF0g" />
       </head>
       <body>
-        <noscript>
-          <div style="padding:40px;font-family:sans-serif;max-width:600px;margin:0 auto">
-            <h1>OopsSubs</h1>
-            <p>OopsSubs is a subscription manager that finds every subscription hidden in your email, reminds you before you're charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services. No server. No database. Your data stays on your device.</p>
-          </div>
-        </noscript>
         <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
