@@ -151,17 +151,24 @@ const SUB_SEARCH_QUERIES = [
 async function searchSubscriptionEmails(token: string): Promise<any[]> {
   const allMessages: any[] = [];
   const seen = new Set<string>();
+  let errors = 0;
   for (const query of SUB_SEARCH_QUERIES) {
     try {
       const res = await fetch(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=20`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (!res.ok) { errors++; continue; }
       const data = await res.json();
       for (const msg of data.messages || []) {
         if (!seen.has(msg.id)) { seen.add(msg.id); allMessages.push(msg); }
       }
-    } catch {}
+    } catch { errors++; }
+  }
+  // If ALL queries failed, likely a token/permission issue
+  if (errors === SUB_SEARCH_QUERIES.length && allMessages.length === 0) {
+    localStorage.removeItem(TOKEN_KEY); // Force re-auth
+    throw new Error("Gmail access failed. Please re-connect your account.");
   }
   return allMessages;
 }
