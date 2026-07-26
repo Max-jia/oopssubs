@@ -1185,6 +1185,20 @@ export default function AppPage() {
                 </motion.div>
               ))}
             </div>
+            {/* Subtle Gmail prompt — only when user has subs but no Gmail */}
+            {!getStoredToken() && subs.length >= 1 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="card mt-6 text-center py-6"
+              >
+                <p className="text-[14px] text-[#86868b] mb-3">Got more subscriptions? Let Gmail find them automatically.</p>
+                <button onClick={handleGmailScan} className="btn-secondary text-[15px] py-3 px-6">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                  Connect Gmail
+                </button>
+              </motion.div>
+            )}
           </div>
         )}
 

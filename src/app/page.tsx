@@ -69,25 +69,8 @@ export default function HomePage() {
         </motion.p>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
-            href="/app?action=scan"
-            className="btn-primary text-[17px] font-semibold py-4 w-full"
-            whileTap={{ scale: 0.94 }}
-            whileHover={{ scale: 1.02, y: -2 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
-          >
-            <motion.svg
-              className="w-5 h-5"
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
-              animate={{ y: [0, -3, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              {iconPaths.mail}
-            </motion.svg>
-            Connect Gmail to scan
-          </motion.a>
-          <motion.a
             href="/app?action=manual"
-            className="btn-secondary text-[17px] py-4 w-full"
+            className="btn-primary text-[17px] font-semibold py-4 w-full"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -101,6 +84,23 @@ export default function HomePage() {
               {iconPaths.plus}
             </motion.svg>
             Add subscriptions manually
+          </motion.a>
+          <motion.a
+            href="/app?action=scan"
+            className="btn-secondary text-[17px] py-4 w-full"
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ scale: 1.02, y: -2 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          >
+            <motion.svg
+              className="w-5 h-5"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            >
+              {iconPaths.mail}
+            </motion.svg>
+            Connect Gmail to scan
           </motion.a>
         </div>
       </div>
