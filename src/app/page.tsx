@@ -37,7 +37,7 @@ export default function HomePage() {
         >
           <motion.img
             src="/icon-512.png"
-            alt="OopsSubs"
+            alt="OopsSubs logo"
             className="w-20 h-20 mx-auto"
             animate={{ scale: [1, 1.04, 1], y: [0, -4, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -45,6 +45,14 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
+        <motion.p
+          className="text-[14px] font-semibold text-[#86868b] uppercase tracking-[0.1em] mb-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          OopsSubs
+        </motion.p>
         <motion.h1
           className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"
           initial={{ opacity: 0, y: 20 }}
@@ -149,10 +157,13 @@ export default function HomePage() {
       </div>
 
       {/* Footer */}
-      <div className="max-w-md mx-auto px-6 pb-10 text-center space-x-4">
-        <Link href="/privacy" className="nav-link">Privacy</Link>
-        <Link href="/terms" className="nav-link">Terms</Link>
-        <Link href="/cancel" className="nav-link">All guides</Link>
+      <div className="max-w-md mx-auto px-6 pb-10 text-center">
+        <p className="text-[13px] text-[#86868b] mb-2">OopsSubs — Find &amp; cancel forgotten subscriptions</p>
+        <div className="space-x-4">
+          <Link href="/privacy" className="nav-link">Privacy</Link>
+          <Link href="/terms" className="nav-link">Terms</Link>
+          <Link href="/cancel" className="nav-link">All guides</Link>
+        </div>
       </div>
     </main>
   );
