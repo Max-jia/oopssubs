@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <noscript>
           <div style="padding:40px;font-family:sans-serif;max-width:600px;margin:0 auto">
             <h1>OopsSubs</h1>
-            <p>OopsSubs is a subscription manager that finds every subscription hidden in your email, reminds you before you&apos;re charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services. No server. No database. Your data stays on your device.</p>
+            <p>OopsSubs is a subscription manager that finds every subscription hidden in your email, reminds you before you're charged, and helps you cancel what you don&apos;t need with step-by-step guides for 79+ services. No server. No database. Your data stays on your device.</p>
           </div>
         </noscript>
         <ClientLayout>{children}</ClientLayout>
