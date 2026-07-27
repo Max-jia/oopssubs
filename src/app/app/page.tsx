@@ -1271,7 +1271,7 @@ export default function AppPage() {
                   </div>
                   <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-2">One quick thing</h3>
                   <p className="text-[14px] text-[#86868b] leading-relaxed">
-                    Google shows an <strong className="text-[#1d1d1f]">"app not verified"</strong> warning for all new apps. This is normal — our verification is in progress.
+                    Google will show a warning: <strong className="text-[#1d1d1f]">"Google hasn&apos;t verified this app"</strong>. This is standard for all new apps — our verification is in progress.
                   </p>
                 </div>
                 <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[#86868b]">
