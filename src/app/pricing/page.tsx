@@ -1,9 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { buyPro, isNativeApp } from "@/lib/purchases";
+import { cancelGuides } from "@/data/cancel-guides";
 
 export default function PricingPage() {
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState("");
+  const [purchased, setPurchased] = useState(false);
+
+  const handleBuy = async () => {
+    setBuying(true); setBuyError("");
+    const res = await buyPro();
+    setBuying(false);
+    if (res.ok) setPurchased(true);
+    else if (!res.cancelled) setBuyError("Purchase failed. Please try again.");
+  };
+
   return (
     <main className="min-h-screen max-w-md mx-auto px-6 py-12 animate-fade-in">
       <Link href="/" className="nav-link inline-flex items-center gap-1 mb-8">
@@ -32,9 +47,8 @@ export default function PricingPage() {
               "Unlimited subscription tracking",
               "Gmail auto-scan & detection",
               "Auto background scan for new subs",
-              "iOS App Store subscription scanner",
               "Android Play Store subscription scanner",
-              "Cancel guide for 79+ services",
+              `Cancel guide for ${cancelGuides.length}+ services`,
               "Pre-filled cancel email templates",
               "Renewal alerts & calendar sync",
               "Lifetime savings tracker",
@@ -47,21 +61,32 @@ export default function PricingPage() {
             ))}
           </ul>
 
-          <a
-            href="https://buy.stripe.com/28EbJ0fOzaNDaZy6He3sI05"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-primary w-full text-[17px] font-semibold py-4"
+          <button
+            onClick={handleBuy}
+            disabled={buying}
+            className="btn-primary w-full text-[17px] font-semibold py-4 disabled:opacity-50"
           >
-            Get OopsSubs Pro — $9.99
-          </a>
+            {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
+          </button>
           <p className="text-[12px] text-[#aeaeb2] mt-3">Pay once. No subscription. No recurring fees.</p>
+          {purchased && <p className="text-[13px] text-[#2e7d32] mt-2">✓ Pro unlocked — enjoy unlimited subscriptions!</p>}
+          {buyError && <p className="text-[13px] text-red-600 mt-2">{buyError}</p>}
         </div>
 
         {/* Trust */}
         <div className="card text-center text-[13px] text-[#86868b] space-y-2">
-          <p>🔒 Secure payment via Stripe</p>
-          <p>💾 Your data stays on your device, always</p>
+          <p className="flex items-center justify-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Secure payment via {isNativeApp() ? "Google Play" : "Stripe"}
+          </p>
+          <p className="flex items-center justify-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+            </svg>
+            Your data stays on your device, always
+          </p>
         </div>
       </motion.div>
     </main>

@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAppStoreSubscriptions } from "@/lib/app-store-scan";
+import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
+import { initPurchases, checkPro, buyPro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
 import { cancelGuides } from "@/data/cancel-guides";
+import { Browser } from "@capacitor/browser";
+import { App as CapApp } from "@capacitor/app";
 
 // ── Known sender domain → service name mapping (auto-generated from cancel guides)
 const SENDER_DOMAIN_MAP: Record<string, string> = {};
@@ -25,6 +28,8 @@ interface Subscription {
   cycle: "monthly" | "yearly" | "quarterly";
   nextDate: string;
   createdAt: string;
+  isTrial?: boolean;
+  trialEnd?: string;
 }
 
 interface ScannedSub {
@@ -42,21 +47,205 @@ const STORAGE_KEY = "oopssubs_subs";
 const TOKEN_KEY = "oopssubs_gmail_token";
 const PENDING_CANCEL_KEY = "oopssubs_pending_cancel";
 const CANCELLED_KEY = "oopssubs_cancelled";
-const PRO_KEY = "oopssubs_pro";
-const FREE_LIMIT = 5;
+const PENDING_PROOF_KEY = "oopssubs_pending_proof";
+const FREE_LIMIT = 3;
 
-function isPro(): boolean { return localStorage.getItem(PRO_KEY) === "true"; }
-function unlockPro() { localStorage.setItem(PRO_KEY, "true"); }
-
-interface CancelledSub { name: string; amount: number; cycle: string; date: string; }
+/* 取消證據：AI 審核結果 + 截圖（截圖只存 IndexedDB，localStorage 5MB 放不下） */
+interface ProofRecord {
+  verified: "ai" | "skipped" | "ai-down";
+  reason?: string; // AI 的判定理由（若有）
+  at: number;
+}
+interface CancelledSub { name: string; amount: number; cycle: string; date: string; subId?: string; proof?: ProofRecord; }
 function getCancelled(): CancelledSub[] {
   try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || '[]'); }
   catch { return []; }
 }
-function addCancelled(sub: Subscription) {
+function addCancelled(sub: Subscription, proof?: ProofRecord) {
   const all = getCancelled();
-  all.push({ name: sub.name, amount: sub.amount, cycle: sub.cycle, date: new Date().toISOString() });
+  all.push({ name: sub.name, amount: sub.amount, cycle: sub.cycle, date: new Date().toISOString(), subId: sub.id, ...(proof ? { proof } : {}) });
   localStorage.setItem(CANCELLED_KEY, JSON.stringify(all));
+}
+
+/* 截圖存 IndexedDB（容量大、不會被清掉） */
+const PROOF_DB = "oopssubs_db";
+const PROOF_STORE = "proof_images";
+function idbOpen(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PROOF_DB, 1);
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(PROOF_STORE)) req.result.createObjectStore(PROOF_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function proofPut(subId: string, dataUrl: string) {
+  try {
+    const db = await idbOpen();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(PROOF_STORE, "readwrite");
+      tx.objectStore(PROOF_STORE).put(dataUrl, subId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch { /* 存失敗不阻斷主流程 */ }
+}
+async function proofGet(subId: string): Promise<string | null> {
+  try {
+    const db = await idbOpen();
+    const val = await new Promise<string | null>((resolve, reject) => {
+      const tx = db.transaction(PROOF_STORE, "readonly");
+      const req = tx.objectStore(PROOF_STORE).get(subId);
+      req.onsuccess = () => resolve((req.result as string) || null);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    return val;
+  } catch { return null; }
+}
+
+/* 未交證據的追債清單：說「已取消」但沒交截圖 → 每 24 小時提醒 */
+interface PendingProof { subId: string; name: string; startedAt: number; }
+function getPendingProofs(): PendingProof[] {
+  try { return JSON.parse(localStorage.getItem(PENDING_PROOF_KEY) || '[]'); }
+  catch { return []; }
+}
+function savePendingProof(p: PendingProof) {
+  const all = getPendingProofs().filter(x => x.subId !== p.subId);
+  all.push(p);
+  localStorage.setItem(PENDING_PROOF_KEY, JSON.stringify(all));
+}
+function clearPendingProof(subId: string) {
+  localStorage.setItem(PENDING_PROOF_KEY, JSON.stringify(getPendingProofs().filter(x => x.subId !== subId)));
+}
+function proofDays(p: PendingProof): number {
+  return Math.floor((Date.now() - p.startedAt) / 86400000) + 1;
+}
+
+/* 截圖壓縮：最長邊 1200px、JPEG 0.85——一張截圖 ~200KB，不會吃光手機空間 */
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1200;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(url); reject(new Error("canvas unavailable")); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
+    img.src = url;
+  });
+}
+
+/* AI 偵探台詞庫：審核結果隨機抽一句（{name} 會換成服務名） */
+const DETECTIVE_LINES_PASS = [
+  "Nice catch. This one's toast.",
+  "Confirmed. Sayonara, {name}.",
+  "Proof accepted. Case closed.",
+  "The bloodsucker is dead.",
+  "Approved. Your wallet breathes again.",
+  "Case closed. {name} won't bug you again.",
+];
+const DETECTIVE_LINES_FAIL = [
+  "Nice try, but I'm not convinced.",
+  "This screenshot says nothing. Get the real one.",
+  "That's not {name}. Don't test me.",
+  "Evidence rejected. I need the cancellation page.",
+  "Hmm… this proves nothing. Try again.",
+];
+function pickDetectiveLine(pass: boolean, name: string): string {
+  const pool = pass ? DETECTIVE_LINES_PASS : DETECTIVE_LINES_FAIL;
+  return pool[Math.floor(Math.random() * pool.length)].replace("{name}", name);
+}
+
+/* 催繳台詞：天數越高偵探越急（4 秒輪換一句） */
+const DEBT_LINES: [string[], string[], string[], string[]] = [
+  ["The case is open. Evidence due.", "Day one. I'm patient. Not for long."],
+  ["I'm waiting. Where's the proof?", "The case is getting cold…", "I can't close this file without evidence."],
+  ["The suspect is getting away!", "My patience has a limit.", "Tick tock. Going cold!"],
+  ["DAY SIX?! The suspect is getting away!", "This is the loudest case on my desk!", "I've seen colder cases. No. I haven't."],
+];
+function debtLevel(days: number): number {
+  return days >= 6 ? 3 : days >= 4 ? 2 : days >= 2 ? 1 : 0;
+}
+
+/* 追債卡片：天數越高動效越煩人（呼吸 → 搖晃 → 紅閃崩潰） */
+function DebtCard({ p, onOpen }: { p: PendingProof; onOpen: () => void }) {
+  const days = proofDays(p);
+  const level = debtLevel(days);
+  const pool = DEBT_LINES[level];
+  const [line, setLine] = useState(() => pool[Math.floor(Math.random() * pool.length)]);
+  useEffect(() => {
+    const t = setInterval(() => setLine(pool[Math.floor(Math.random() * pool.length)]), 4000);
+    return () => clearInterval(t);
+  }, [level]);
+
+  // 動效參數：等級越高搖越大、閃越快；第 1 天只有呼吸
+  const shakeX = level >= 3 ? [0, -8, 8, -5, 5, 0] : level >= 2 ? [0, -6, 6, -4, 4, 0] : level === 1 ? [0, -3, 3, 0] : [0];
+  const shakeDur = level >= 3 ? 1.1 : level >= 2 ? 1.6 : 2.4;
+  const breathe = level === 0 ? [1, 1.015, 1] : level >= 3 ? [1, 1.03, 1] : [1, 1.02, 1];
+  const breatheDur = level === 0 ? 2.8 : level >= 3 ? 1.4 : 2;
+  const flashPeak = level >= 3 ? 0.18 : level >= 2 ? 0.12 : 0;
+  const flashDur = level >= 3 ? 0.8 : 1.2;
+
+  return (
+    <motion.div
+      className="card bg-[#1d1d1f] overflow-hidden mb-6"
+      animate={{ x: shakeX, scale: breathe }}
+      transition={{ duration: shakeDur, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <div className="relative px-5 py-4">
+        {/* 紅閃層：天數越高紅光越強 */}
+        {flashPeak > 0 && (
+          <motion.div
+            className="absolute inset-0 bg-[#e65100]"
+            animate={{ opacity: [0, flashPeak, 0] }}
+            transition={{ duration: flashDur, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
+        <div className="relative">
+          <p className="text-[10px] font-bold tracking-[0.16em] text-[#e65100] mb-2">OPEN CASE · EVIDENCE DUE</p>
+          <motion.p
+            className="text-[40px] font-black leading-none text-[#e65100]"
+            animate={level >= 2 ? { scale: [1, 1.12, 1] } : {}}
+            transition={{ duration: level >= 3 ? 0.7 : 1.1, repeat: Infinity, ease: "easeInOut" }}
+          >
+            DAY {days}
+          </motion.p>
+          <p className="text-[16px] font-semibold text-white mt-1">{p.name}</p>
+          <p className="text-[13px] text-white/45 min-h-[18px] mt-0.5 mb-4">{line}</p>
+          <button
+            onClick={onOpen}
+            className="w-full bg-[#e65100] text-white text-[15px] font-semibold py-3 rounded-xl active:scale-[0.98] transition-transform"
+          >
+            Turn in the evidence
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* 送截圖給網站後台 → Gemini 審核。後台只在網站伺服器上有鑰匙，App 拿不到。
+   App 內部伺服器沒有 /api，必須呼叫線上網站；網站版同源用相對路徑。 */
+async function callVerifyProof(sub: Subscription, dataUrl: string): Promise<{ aiAvailable: boolean; passed: boolean; confidence: string; reason: string }> {
+  const comma = dataUrl.indexOf(",");
+  const mimeType = dataUrl.slice(5, comma).includes("png") ? "image/png" : "image/jpeg";
+  const base = isNativeApp() ? "https://oopssubs.com" : "";
+  const res = await fetch(`${base}/api/verify-proof/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: sub.name, amount: fmtCurrency(sub.amount), cycle: sub.cycle, imageBase64: dataUrl.slice(comma + 1), mimeType }),
+  });
+  if (!res.ok) throw new Error("AI unavailable");
+  return res.json();
 }
 function lifetimeSavings(): number {
   return getCancelled().reduce((sum, c) => sum + (c.cycle === 'yearly' ? c.amount : c.amount * 12), 0);
@@ -95,8 +284,28 @@ function fmtCurrency(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
 function daysUntil(dateStr: string): number {
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  return Math.ceil((new Date(dateStr).getTime() - now.getTime()) / 86400000);
+  // 日期字串「YYYY-MM-DD」在 JS 中固定解析成格林威治(UTC)午夜，
+  // 所以「今天」也必須用 UTC 午夜來算，否則台灣時間(UTC+8)會差 8 小時。
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.ceil((new Date(dateStr).getTime() - todayUTC) / 86400000);
+}
+// Find the cancel guide slug for a subscription name (fuzzy match), null if no guide exists
+function cancelSlugFor(name: string): string | null {
+  const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const guide = cancelGuides.find((g) => {
+    const gkey = g.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return gkey === key || key.includes(gkey) || gkey.includes(key);
+  });
+  return guide ? guide.slug : null;
+}
+// Advance a date by one billing cycle (used when keeping an expired trial)
+function advanceDate(dateStr: string, cycle: string): string {
+  const d = new Date(dateStr);
+  if (cycle === "yearly") d.setFullYear(d.getFullYear() + 1);
+  else if (cycle === "quarterly") d.setMonth(d.getMonth() + 3);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 /* ── Gmail helpers ── */
@@ -111,10 +320,16 @@ function getStoredToken(): string | null { return localStorage.getItem(TOKEN_KEY
 async function gapiInit(): Promise<void> {
   return new Promise((resolve, reject) => {
     if ((window as any).gapiInited) { resolve(); return; }
-    const gapi = (window as any).gapi;
-    if (!gapi) { reject(new Error("Google API not loaded yet. Try again.")); return; }
-    (window as any).gapiInited = true;
-    gapi.load("client", { callback: resolve });
+    // gapi script 是頁面掛載後才動態載入的——首次掃描時可能還沒就緒，
+    // 若立即放棄會導致「第一次掃描必失敗」。輪詢等待最多 15 秒。
+    const started = Date.now();
+    const check = () => {
+      const gapi = (window as any).gapi;
+      if (gapi) { (window as any).gapiInited = true; gapi.load("client", { callback: resolve }); return; }
+      if (Date.now() - started > 15000) { reject(new Error("Google API load timed out. Try again.")); return; }
+      setTimeout(check, 200);
+    };
+    check();
   });
 }
 
@@ -132,8 +347,10 @@ async function gisInit(): Promise<any> {
 }
 
 async function initGapiClient(token: string) {
-  await (window as any).gapi.client.init({});
-  (window as any).gapi.client.setToken({ access_token: token });
+  // gapi.client 在 App WebView 環境不可靠（gapi.load 的 client 庫載入行為異常），
+  // 但實際掃描全走 fetch + Bearer token，根本不依賴 gapi——這裡只保留 token。
+  // （網站版「首次掃描必失敗」的競態問題也隨之根除：不必再等 gapi script。）
+  try { (window as any).gapi?.client?.setToken?.({ access_token: token }); } catch { /* noop */ }
 }
 
 /* ── Step 1: Subject-first precision search + broad supplementary ── */
@@ -534,16 +751,25 @@ function generateICS(sub: Subscription): string {
   ].join("\r\n");
 }
 
-async function addToCalendar(sub: Subscription) {
+// Everywhere (app, mobile web, desktop web): Google Calendar API only — no .ics file downloads.
+function calendarGoogleOnly(): boolean {
+  return true;
+}
+
+async function addToCalendar(sub: Subscription): Promise<string | null> {
   const token = getStoredToken();
   if (token) {
     // Try direct Google Calendar API first —
     const d = new Date(sub.nextDate + "T10:00:00");
     const end = new Date(d.getTime() + 3600000);
     try {
+      // 3s timeout — if the Calendar API is slow/unreachable, fail fast on mobile
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
       const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           summary: `Cancel ${sub.name}?`,
           description: `${sub.name} · ${fmtCurrency(sub.amount)}/${sub.cycle}\n\nAdded by OopsSubs`,
@@ -555,12 +781,18 @@ async function addToCalendar(sub: Subscription) {
           },
         }),
       });
+      clearTimeout(timer);
       if (res.ok) {
-        return; // Success — event created directly, no download
+        return null; // Success — event created directly, no download
       }
     } catch {}
+    if (calendarGoogleOnly()) {
+      return "Couldn't write to your calendar — tap again to retry";
+    }
+  } else if (calendarGoogleOnly()) {
+    return "Connect Gmail first, then tap the calendar icon";
   }
-  // Fallback: download ICS file
+  // Desktop fallback: download ICS file
   const ics = generateICS(sub);
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -571,13 +803,25 @@ async function addToCalendar(sub: Subscription) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return null;
 }
 
 /* ── Subscription Row ── */
-function SubscriptionRow({ sub, onDelete }: { sub: Subscription; onDelete: () => void }) {
+function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onDelete: () => void; onCalError: (msg: string) => void }) {
   const [addedToCal, setAddedToCal] = useState(false);
+  const [calBusy, setCalBusy] = useState(false);
+  const handleAddToCalendar = async () => {
+    setCalBusy(true);
+    const err = await addToCalendar(sub);
+    setCalBusy(false);
+    if (err) { onCalError(err); return; }
+    setAddedToCal(true);
+    setTimeout(() => setAddedToCal(false), 2000);
+  };
   const days = daysUntil(sub.nextDate);
-  const urgency = days <= 3 ? "text-[#c62828] bg-[#ffebee]" : days <= 7 ? "text-[#e65100] bg-[#fff3e0]" : "text-[#86868b] bg-[#f5f5f7]";
+  const urgency = sub.isTrial
+    ? (days <= 3 ? "text-[#c62828] bg-[#ffebee]" : "text-[#e65100] bg-[#fff3e0]")
+    : days <= 3 ? "text-[#c62828] bg-[#ffebee]" : days <= 7 ? "text-[#e65100] bg-[#fff3e0]" : "text-[#86868b] bg-[#f5f5f7]";
   return (
     <div className="flex items-center justify-between py-3.5 px-5 hover:bg-[#f5f5f7]/50 transition-colors duration-150 group -mx-5 rounded-2xl">
       <div className="flex items-center gap-3.5 min-w-0">
@@ -585,20 +829,31 @@ function SubscriptionRow({ sub, onDelete }: { sub: Subscription; onDelete: () =>
           {sub.name[0].toUpperCase()}
         </div>
         <div className="min-w-0">
-          <div className="text-[15px] font-medium truncate">{sub.name}</div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="text-[15px] font-medium truncate">{sub.name}</div>
+            {sub.isTrial && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fff3e0] text-[#e65100] flex-shrink-0">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Free trial
+              </span>
+            )}
+          </div>
           <div className="text-[13px] text-[#86868b]">{fmtCurrency(sub.amount)}/{sub.cycle === 'monthly' ? 'mo' : sub.cycle === 'yearly' ? 'yr' : 'qtr'}</div>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className={`text-[12px] font-medium px-2.5 py-1 rounded-full ${urgency}`}>
-          {days <= 0 ? "Due" : days === 1 ? "Tmrw" : `${days}d`}
+          {days <= 0 ? (sub.isTrial ? "Trial ended" : "Due") : sub.isTrial ? `${days}d left` : days === 1 ? "Tmrw" : `${days}d`}
         </span>
         <button
-          onClick={() => { addToCalendar(sub); setAddedToCal(true); setTimeout(() => setAddedToCal(false), 2000); }}
-          className="opacity-0 group-hover:opacity-100 text-[#aeaeb2] hover:text-[#1d1d1f] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[#e8e8ed] flex items-center justify-center"
+          onClick={handleAddToCalendar}
+          disabled={calBusy}
+          className="text-[#aeaeb2] hover:text-[#1d1d1f] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[#e8e8ed] flex items-center justify-center disabled:opacity-50"
           title="Add to calendar"
         >
-          {addedToCal ? (
+          {calBusy ? (
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+          ) : addedToCal ? (
             <svg className="w-4 h-4 text-[#2e7d32]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
           ) : (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
@@ -618,25 +873,72 @@ export default function AppPage() {
   const [scannedItems, setScannedItems] = useState<ScannedSub[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", amount: "", cycle: "monthly" as const, nextDate: "" });
+  const [form, setForm] = useState({ name: "", amount: "", cycle: "monthly" as const, nextDate: "", isTrial: false, trialEnd: "" });
   const [mounted, setMounted] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [followUpCancel, setFollowUpCancel] = useState<PendingCancel | null>(null);
   const [celebration, setCelebration] = useState<CancelledSub | null>(null);
   const [showWeekly, setShowWeekly] = useState(false);
+  const [trialAlert, setTrialAlert] = useState<(Subscription & { slug: string | null }) | null>(null);
   const [pro, setPro] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showTrustModal, setShowTrustModal] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState("");
+
+  // 取消證據流程（取消證明制：沒交截圖證明，取消提醒會一直持續）
+  const [proof, setProof] = useState<{
+    sub: Subscription;
+    stage: "select" | "reviewing" | "result" | "confirm" | "done";
+    image: string | null;
+    verdict: { aiAvailable: boolean; passed: boolean; confidence: string; reason: string } | null;
+    aiError: boolean;
+    line: string; // 偵探台詞（隨機抽）
+    verified: "ai" | "skipped" | "ai-down" | null;
+    checks: [boolean, boolean, boolean];
+    hold: number; // 長按 3 秒進度 0–1
+  } | null>(null);
+  const [pendingProofs, setPendingProofs] = useState<PendingProof[]>([]);
+  const [proofViewer, setProofViewer] = useState<{ name: string; dataUrl: string } | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 回看取消證據：從 IndexedDB 撈截圖（key = 訂閱 id）
+  const viewProof = useCallback(async (c: CancelledSub) => {
+    const dataUrl = await proofGet(c.subId || "");
+    if (dataUrl) setProofViewer({ name: c.name, dataUrl });
+  }, []);
+
+  // 拿到 Gmail token 後啟動掃描——網站版（hash 回跳）與 App 版（deep link 回跳）共用
+  const startScan = useCallback(async (token: string) => {
+    try {
+      await initGapiClient(token);
+      setScanning(true); setScanStatus("Searching inbox...");
+      const messages = await searchSubscriptionEmails(token);
+      if (messages.length === 0) { setScannedItems([]); setError("No subscription-related emails found in the last 2 years. Try adding manually."); setScanning(false); return; }
+      setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+      const bodies: { text: string; trialEnd: string }[] = [];
+      for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
+      const dedupedBodies = dedupeBodiesBySender(bodies);
+      setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+      const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
+      if (extracted.length === 0) setError(`AI analyzed ${bodies.length} emails but found no subscriptions.`);
+      setScannedItems(extracted); setScanning(false); setScanStatus("");
+    } catch (e: any) {
+      // 診斷版：顯示具體錯誤（v14 後改回友善提示）
+      setScanning(false); setError("Scan failed: " + String(e?.message || e));
+    }
+  }, []);
 
   useEffect(() => {
     setSubs(loadSubs());
-    // Check PRO unlock via URL param
-    if (window.location.search.includes("pro=unlocked")) {
-      unlockPro(); setPro(true);
-      window.history.replaceState({}, "", "/app");
-    }
-    setPro(isPro());
-    // Handle OAuth redirect callback (token in URL hash)
+    setPendingProofs(getPendingProofs());
+    // Check PRO status: native = RevenueCat in-app purchase; web = Stripe purchase (restored on return)
+    initPurchases().then(async () => {
+      const fromStripe = await handleStripeReturn();
+      setPro(fromStripe || (await checkPro()));
+    });
+    // Handle OAuth redirect callback (token in URL hash) — 網站版流程
     const hash = window.location.hash;
     if (hash && hash.includes("access_token")) {
       const params = new URLSearchParams(hash.slice(1));
@@ -646,23 +948,22 @@ export default function AppPage() {
         localStorage.setItem(TOKEN_KEY, token);
         window.location.hash = "";
         // Trigger scan with the new token
-        setTimeout(async () => {
-          try {
-            await initGapiClient(token);
-            setScanning(true); setScanStatus("Searching inbox...");
-            const messages = await searchSubscriptionEmails(token);
-            if (messages.length === 0) { setScannedItems([]); setError("No subscription-related emails found in the last 2 years. Try adding manually."); setScanning(false); return; }
-            setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
-            const bodies: { text: string; trialEnd: string }[] = [];
-            for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
-            const dedupedBodies = dedupeBodiesBySender(bodies);
-            setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
-            const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
-            if (extracted.length === 0) setError(`AI analyzed ${bodies.length} emails but found no subscriptions.`);
-            setScannedItems(extracted); setScanning(false); setScanStatus("");
-          } catch { setScanning(false); setError("Scan failed. Please try again."); }
-        }, 500);
+        setTimeout(() => startScan(token), 500);
       }
+    }
+    // Handle OAuth deep-link return — App 版流程：
+    // 系統瀏覽器 → oopssubs.com/oauth-app → com.oopssubs.app://oauth#access_token=...
+    if (isNativeApp()) {
+      CapApp.addListener("appUrlOpen", (data: any) => {
+        const url: string = data?.url || "";
+        const params = new URLSearchParams((url.split("#")[1] || ""));
+        const token = params.get("access_token");
+        const state = params.get("state");
+        if (token && state === "scan") {
+          localStorage.setItem(TOKEN_KEY, token);
+          startScan(token);
+        }
+      });
     }
     // Check for pending cancel follow-ups
     const pending = getPendingCancels();
@@ -693,23 +994,32 @@ export default function AppPage() {
     return () => clearInterval(check);
   }, []);
 
-  // Auto-trigger action from URL params (wait for GAPI to load first)
+  // Auto-trigger action from URL hash (#action=manual / #action=scan)
+  // Hash is used instead of query params — Capacitor's local server can't resolve
+  // query-string URLs for static exports, which made the app bounce back to home.
   useEffect(() => {
     if (!mounted) return;
-    const url = new URL(window.location.href);
-    const action = url.searchParams.get('action');
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const action = hashParams.get("action");
     if (action === 'scan') {
-      // Wait for gapi to be available before triggering scan
-      const waitForGapi = () => {
-        if ((window as any).gapi) {
-          handleGmailScan();
-        } else {
-          setTimeout(waitForGapi, 200);
-        }
-      };
-      waitForGapi();
+      if (isNativeApp()) {
+        // Native app: no gapi — scan flow skips GIS itself
+        handleGmailScan();
+      } else {
+        // Wait for gapi to be available before triggering scan
+        const waitForGapi = () => {
+          if ((window as any).gapi) {
+            handleGmailScan();
+          } else {
+            setTimeout(waitForGapi, 200);
+          }
+        };
+        waitForGapi();
+      }
     } else if (action === 'manual') {
-      setShowAdd(true);
+      // Free limit reached → paywall straight away, no empty form filling
+      if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true);
+      else setShowAdd(true);
     }
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -767,36 +1077,207 @@ export default function AppPage() {
     doBackgroundScan();
   }, [mounted, subs.length]);
 
+  // Send a notification: native app → Capacitor Local Notifications (system notification),
+  // web/PWA → Web Notification API. slug = cancel-guide slug for the "Cancel it" action.
+  const notify = useCallback(async (title: string, body: string, slug?: string | null) => {
+    try {
+      if (isNativeApp()) {
+        const { LocalNotifications } = await import("@capacitor/local-notifications");
+        const perm = await LocalNotifications.checkPermissions();
+        if (perm.display !== "granted") await LocalNotifications.requestPermissions();
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: Date.now() + Math.floor(Math.random() * 1000), title, body,
+            extra: slug ? { slug } : {},
+            actionTypeId: slug ? "cancel_action" : undefined,
+            schedule: { at: new Date(Date.now() + 1000) },
+          }],
+        });
+      } else if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        const n = new Notification(title, { body, icon: "/icon-192.png" });
+        n.onclick = () => window.focus();
+      }
+    } catch {}
+  }, []);
+
+  // Native app: tapping the "Cancel it" action on a notification jumps to the cancel guide
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let alive = true;
+    (async () => {
+      const { LocalNotifications } = await import("@capacitor/local-notifications");
+      if (!alive) return;
+      await LocalNotifications.registerActionTypes({
+        types: [{ id: "cancel_action", actions: [{ id: "cancel", title: "Cancel it" }] }],
+      });
+      await LocalNotifications.addListener("localNotificationActionPerformed", (e) => {
+        if (e.actionId === "cancel" && (e.notification.extra as any)?.slug) {
+          window.location.href = `/cancel/${(e.notification.extra as any).slug}`;
+        }
+      });
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Reminders: trials (3d/1d before auto-charge) and renewals — each fires once per due date
   useEffect(() => {
     if (!mounted || subs.length === 0) return;
     subs.forEach((sub) => {
       const days = daysUntil(sub.nextDate);
-      if (days === 3 || days === 1) {
-        try { new Notification("OopsSubs", { body: `${sub.name} renews in ${days} day${days > 1 ? "s" : ""} — ${fmtCurrency(sub.amount)}`, icon: "/icon-192.png" }); } catch {}
+      if (days !== 3 && days !== 1) return;
+      if (sub.isTrial) {
+        const key = `oopssubs_trial_notif_${sub.id}_${days}_${sub.nextDate}`;
+        if (localStorage.getItem(key)) return;
+        notify(
+          `${sub.name} free trial ends ${days === 1 ? "tomorrow" : `in ${days} days`}`,
+          `It will auto-charge ${fmtCurrency(sub.amount)}. Cancel before ${new Date(sub.nextDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`,
+          cancelSlugFor(sub.name)
+        );
+        localStorage.setItem(key, "1");
+      } else {
+        const key = `oopssubs_notif_${sub.id}_${days}_${sub.nextDate}`;
+        if (localStorage.getItem(key)) return;
+        notify("OopsSubs", `${sub.name} renews in ${days} day${days > 1 ? "s" : ""} — ${fmtCurrency(sub.amount)}`, cancelSlugFor(sub.name));
+        localStorage.setItem(key, "1");
       }
     });
+  }, [subs, mounted, notify]);
+
+  // Trial expiring today or already expired → top banner with a Cancel shortcut
+  useEffect(() => {
+    if (!mounted) return;
+    const list = subs
+      .filter((s) => s.isTrial && daysUntil(s.nextDate) <= 0)
+      .sort((a, b) => daysUntil(a.nextDate) - daysUntil(b.nextDate));
+    const t = list.find((s) => !localStorage.getItem(`oopssubs_trial_dismissed_${s.id}_${s.nextDate}`));
+    setTrialAlert(t ? { ...t, slug: cancelSlugFor(t.name) } : null);
   }, [subs, mounted]);
+
+  const dismissTrialAlert = useCallback(() => {
+    if (!trialAlert) return;
+    localStorage.setItem(`oopssubs_trial_dismissed_${trialAlert.id}_${trialAlert.nextDate}`, "1");
+    setTrialAlert(null);
+  }, [trialAlert]);
+
+  // Keep an expired trial → becomes a regular subscription, next charge pushed one cycle ahead
+  const keepTrial = useCallback(() => {
+    if (!trialAlert) return;
+    const updated = subs.map((s) =>
+      s.id === trialAlert.id
+        ? { ...s, isTrial: undefined, trialEnd: undefined, nextDate: advanceDate(s.nextDate, s.cycle) }
+        : s
+    );
+    setSubs(updated); saveSubs(updated);
+    setTrialAlert(null);
+  }, [subs, trialAlert]);
 
   const addSub = useCallback(() => {
     if (!form.name || !form.amount) return;
     if (!pro && subs.length >= FREE_LIMIT) { setShowPaywall(true); return; }
     const sub: Subscription = {
       id: uuid(), name: form.name.trim(), amount: parseFloat(form.amount),
-      cycle: form.cycle, nextDate: form.nextDate || new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
+      cycle: form.cycle,
+      nextDate: form.isTrial && form.trialEnd ? form.trialEnd : (form.nextDate || new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)),
       createdAt: new Date().toISOString(),
+      ...(form.isTrial ? { isTrial: true, trialEnd: form.trialEnd || undefined } : {}),
     };
     const updated = [...subs, sub];
     setSubs(updated); saveSubs(updated);
-    setForm({ name: "", amount: "", cycle: "monthly", nextDate: "" }); setShowAdd(false);
+    setForm({ name: "", amount: "", cycle: "monthly", nextDate: "", isTrial: false, trialEnd: "" }); setShowAdd(false);
   }, [form, subs, pro]);
 
-  const deleteSub = useCallback((id: string) => {
+  const handleBuyPro = useCallback(async () => {
+    setBuying(true); setBuyError("");
+    const res = await buyPro();
+    setBuying(false);
+    if (res.ok) { setPro(true); setShowPaywall(false); }
+    else if (!res.cancelled) { setBuyError("Purchase failed. Please try again."); }
+  }, []);
+
+  const deleteSub = useCallback((id: string, proofRec?: ProofRecord) => {
     const deleted = subs.find(s => s.id === id);
-    if (deleted) addCancelled(deleted);
+    if (deleted) addCancelled(deleted, proofRec);
     const updated = subs.filter((s) => s.id !== id);
     setSubs(updated); saveSubs(updated);
     if (deleted) { setCelebration({ name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString() }); setTimeout(() => setCelebration(null), 5000); }
   }, [subs]);
+
+  /* ── 取消證據流程 ── */
+  const openProofFlow = useCallback((sub: Subscription) => {
+    setProof({ sub, stage: "select", image: null, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0 });
+  }, []);
+
+  // 關閉證據流程：沒完成 = 列入追債清單（保留首次開始時間，天數才不會被重開重置）
+  const closeProofFlow = useCallback(() => {
+    if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null; }
+    if (!proof) return;
+    if (proof.stage !== "done") {
+      const existing = getPendingProofs().find(x => x.subId === proof.sub.id);
+      savePendingProof({ subId: proof.sub.id, name: proof.sub.name, startedAt: existing?.startedAt || Date.now() });
+      setPendingProofs(getPendingProofs());
+    }
+    setProof(null);
+  }, [proof]);
+
+  // 證據完成 → 真正刪除 + 記錄帶證據 + 清掉所有相關提醒
+  const finishProof = useCallback(() => {
+    if (!proof) return;
+    const { sub } = proof;
+    const verified = proof.verified || "skipped";
+    const rec: ProofRecord = {
+      verified,
+      ...(proof.verdict?.reason ? { reason: proof.verdict.reason } : {}),
+      at: Date.now(),
+    };
+    if (proof.image) proofPut(sub.id, proof.image);
+    deleteSub(sub.id, rec);
+    clearPendingCancel(sub.id);
+    clearPendingProof(sub.id);
+    setPendingProofs(getPendingProofs());
+    setFollowUpCancel(null);
+    setProof(p => (p ? { ...p, stage: "done" } : p));
+    setTimeout(() => setProof(null), 2200);
+  }, [proof, deleteSub]);
+
+  // 選圖 → 壓縮 → 送後台給 AI 審核；AI 故障自動降級（不卡死用戶）
+  const handleProofFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !proof) return;
+    try {
+      const dataUrl = await compressImage(file);
+      setProof(p => (p ? { ...p, image: dataUrl, stage: "reviewing", verdict: null, aiError: false } : p));
+      try {
+        const verdict = await callVerifyProof(proof.sub, dataUrl);
+        setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+      } catch {
+        setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
+      }
+    } catch {
+      setError("Could not read that image. Try another screenshot.");
+      setTimeout(() => setError(""), 4000);
+    }
+  }, [proof]);
+
+  // 長按 3 秒：滿了才放行（鬆手或滑出去都會重置）
+  const startHold = useCallback(() => {
+    if (!proof || !proof.checks.every(Boolean)) return;
+    const startAt = Date.now();
+    holdTimerRef.current = setInterval(() => {
+      const el = Date.now() - startAt;
+      setProof(p => (p ? { ...p, hold: Math.min(1, el / 3000) } : p));
+      if (el >= 3000) {
+        if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null; }
+        try { navigator.vibrate?.(60); } catch { /* noop */ }
+        finishProof();
+      }
+    }, 50);
+  }, [proof, finishProof]);
+
+  const endHold = useCallback(() => {
+    if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null; }
+    setProof(p => (p ? { ...p, hold: 0 } : p));
+  }, []);
 
   const handleAppStoreScan = useCallback(async () => {
     const subs = await getAppStoreSubscriptions();
@@ -815,7 +1296,10 @@ export default function AppPage() {
     // Safety timeout: if scan takes >45s, show error
     const timeout = setTimeout(() => { setError("Scan is taking longer than expected. Results may still appear."); setScanning(false); }, 90000);
     try {
-      await gapiInit(); const oauth2 = await gisInit();
+      // Native app: skip GIS (Google blocks its popup login inside WebViews) — go straight to the direct redirect
+      if (!isNativeApp()) {
+        await gapiInit(); const oauth2 = await gisInit();
+      }
       const doScan = async (token: string) => {
         localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
         setScanStatus("Searching inbox...");
@@ -878,6 +1362,7 @@ export default function AppPage() {
       id: uuid(), name: item.name, amount: item.amount, cycle: item.cycle,
       nextDate,
       createdAt: new Date().toISOString(),
+      ...(item.isTrial ? { isTrial: true, trialEnd: item.trialEnd || undefined } : {}),
     };
     const updated = [...subs, sub]; setSubs(updated); saveSubs(updated);
     setScannedItems((prev) => prev.filter((_, i) => i !== idx));
@@ -914,7 +1399,8 @@ export default function AppPage() {
             <button
               onClick={() => {
                 savePendingCancel({ subId: s.id, name: s.name, timestamp: Date.now() });
-                window.open(`/cancel/${s.name.toLowerCase().replace(/\s+/g, '-')}`, '_blank');
+                const cancelSlug = cancelSlugFor(s.name);
+                window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
               }}
               className="flex-shrink-0 bg-white text-[#1d1d1f] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
@@ -939,9 +1425,10 @@ export default function AppPage() {
             <div className="flex gap-2 flex-shrink-0">
               <button
                 onClick={() => {
-                  deleteSub(followUpCancel.subId);
-                  clearPendingCancel(followUpCancel.subId);
-                  setFollowUpCancel(null);
+                  // 「已取消」不再是隨口一說：先開證據流程，交完截圖證明才算數
+                  const sub = subs.find(s => s.id === followUpCancel.subId);
+                  if (sub) { setFollowUpCancel(null); openProofFlow(sub); }
+                  else { deleteSub(followUpCancel.subId); clearPendingCancel(followUpCancel.subId); setFollowUpCancel(null); }
                 }}
                 className="bg-[#e65100] text-white text-[13px] font-semibold px-3 py-1.5 rounded-full active:scale-95"
               >
@@ -989,7 +1476,11 @@ export default function AppPage() {
               exit={{ y: -50, opacity: 0 }}
               className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[#1d1d1f] text-white rounded-3xl px-6 py-5 shadow-2xl flex items-center gap-4"
             >
-              <span className="text-[32px]">🎉</span>
+              <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+              </span>
               <div className="flex-1">
                 <p className="text-[14px] font-semibold">Cancelled {celebration.name}!</p>
                 <p className="text-[13px] text-white/60">
@@ -1012,7 +1503,7 @@ export default function AppPage() {
             )}
             {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
             {pro && <span className="text-[12px] font-semibold text-[#2e7d32]">PRO</span>}
-            <button onClick={() => setShowAdd(true)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
+            <button onClick={() => { if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true); else setShowAdd(true); }} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
               + Add
             </button>
           </div>
@@ -1143,6 +1634,51 @@ export default function AppPage() {
         {/* List */}
         {subs.length > 0 && (
           <div className="animate-slide-down">
+            {/* Trial expiring banner */}
+            <AnimatePresence>
+              {trialAlert && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="card bg-[#fff3e0] border border-[#ffe0b2] mb-6"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[15px] font-semibold text-[#1d1d1f] mb-1">
+                        {daysUntil(trialAlert.nextDate) === 0
+                          ? `Today: ${trialAlert.name} free trial ends`
+                          : `${trialAlert.name} trial ended — you may have been charged`}
+                      </p>
+                      <p className="text-[13px] text-[#86868b] leading-relaxed">
+                        {daysUntil(trialAlert.nextDate) === 0
+                          ? `It will auto-charge ${fmtCurrency(trialAlert.amount)} today.`
+                          : `You may have been charged ${fmtCurrency(trialAlert.amount)}. Keep it or cancel?`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={keepTrial}
+                        className="bg-[#fff3e0] hover:bg-[#ffe0b2] active:scale-95 transition-all duration-150 text-[#e65100] text-[13px] font-medium px-3.5 py-2 rounded-full"
+                      >
+                        Keep it
+                      </button>
+                      <Link
+                        href={trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel"}
+                        className="bg-[#e65100] hover:bg-[#bf360c] active:scale-95 transition-all duration-150 text-white text-[13px] font-medium px-3.5 py-2 rounded-full"
+                      >
+                        Cancel it
+                      </Link>
+                      <button
+                        onClick={dismissTrialAlert}
+                        className="text-[#86868b] hover:text-[#1d1d1f] text-lg w-7 h-7 rounded-full hover:bg-[#ffe0b2] flex items-center justify-center"
+                      >&times;</button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Weekly checkup banner */}
             <AnimatePresence>
               {showWeekly && (
@@ -1167,6 +1703,14 @@ export default function AppPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* 未交取消證據的追債提醒：天數越高動效越煩人，直到交證據 */}
+            {pendingProofs.map((p) => {
+              const sub = subs.find(s => s.id === p.subId);
+              if (!sub) return null;
+              return <DebtCard key={p.subId} p={p} onOpen={() => openProofFlow(sub)} />;
+            })}
+
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Your subscriptions</h2>
               <button onClick={handleGmailScan} disabled={scanning} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] font-medium transition-colors">Scan again</button>
@@ -1181,7 +1725,11 @@ export default function AppPage() {
                   exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
                   className={i !== subs.length - 1 ? 'border-b border-[#e5e5ea]' : ''}
                 >
-                  <SubscriptionRow sub={sub} onDelete={() => deleteSub(sub.id)} />
+                  <SubscriptionRow
+                    sub={sub}
+                    onDelete={() => openProofFlow(sub)}
+                    onCalError={(m) => { setError(m); setTimeout(() => setError(""), 4000); }}
+                  />
                 </motion.div>
               ))}
             </div>
@@ -1201,6 +1749,297 @@ export default function AppPage() {
             )}
           </div>
         )}
+
+        {/* 已取消清單（有證據的顯示迴紋針圖示，點開可回看截圖） */}
+        {getCancelled().length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Cancelled</h2>
+              <span className="text-[12px] text-[#aeaeb2] inline-flex items-center gap-1">
+                with proof
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                </svg>
+              </span>
+            </div>
+            <div className="card p-0 overflow-hidden">
+              {getCancelled().slice().reverse().map((c, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between px-5 py-3.5 ${i !== getCancelled().length - 1 ? 'border-b border-[#e5e5ea]' : ''}`}
+                >
+                  <div>
+                    <p className="text-[15px] font-medium text-[#1d1d1f]">{c.name}</p>
+                    <p className="text-[12px] text-[#86868b]">{fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr</p>
+                  </div>
+                  {c.proof ? (
+                    <button
+                      onClick={() => viewProof(c)}
+                      className="p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors active:scale-95"
+                      title="View cancellation proof"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <svg className="w-5 h-5 text-[#d2d2d7] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                    </svg>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 取消證據流程（Cancel proof）— 全屏 */}
+        <AnimatePresence>
+          {proof && (
+            <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-fade-in">
+              <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
+                <button onClick={closeProofFlow} className="text-[#86868b] text-[26px] leading-none px-2 hover:text-[#1d1d1f] transition-colors" disabled={proof.stage === "done"}>&times;</button>
+                <h2 className="text-[15px] font-semibold text-[#1d1d1f]">Cancel proof</h2>
+                <div className="w-9" />
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 pb-10">
+                {proof.stage === "select" && (
+                  <div className="text-center pt-6">
+                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[#fff3e0] flex items-center justify-center">
+                      <svg className="w-8 h-8 text-[#b25000]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316zM16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Prove it</h3>
+                    <p className="text-[14px] text-[#86868b] leading-relaxed mb-7 max-w-[280px] mx-auto">
+                      {proof.sub.name} — {fmtCurrency(proof.sub.amount)}{proof.sub.cycle === 'monthly' ? '/mo' : proof.sub.cycle === 'yearly' ? '/yr' : '/qtr'}. Upload a screenshot showing it was cancelled.
+                    </p>
+                    {proof.image ? (
+                      <div className="card p-3 mb-6">
+                        <img src={proof.image} alt="Screenshot preview" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />
+                      </div>
+                    ) : (
+                      <div className="h-44 rounded-2xl border-2 border-dashed border-[#d2d2d7] flex flex-col items-center justify-center mb-6 bg-[#fafafa]">
+                        <svg className="w-8 h-8 text-[#aeaeb2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        <p className="text-[13px] mt-2">No screenshot yet</p>
+                      </div>
+                    )}
+                    <button onClick={() => fileInputRef.current?.click()} className="btn-primary text-[16px] font-semibold py-4 w-full">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      Choose screenshot
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofFile} />
+                    <p className="text-[12px] text-[#aeaeb2] mt-5 leading-relaxed max-w-xs mx-auto">
+                      Screenshots are checked by AI and stored only on this device. The cancellation reminder stays until proof is submitted.
+                    </p>
+                  </div>
+                )}
+
+                {proof.stage === "reviewing" && (
+                  <div className="pt-8">
+                    {/* 偵探放大鏡掃描截圖 */}
+                    <div className="relative mx-auto mb-8 w-full max-w-[280px] aspect-[4/3] rounded-2xl bg-[#f5f5f7] overflow-hidden">
+                      {proof.image && <img src={proof.image} alt="Evidence" className="w-full h-full object-contain" />}
+                      <motion.div
+                        className="absolute"
+                        style={{ left: "15%", top: "30%" }}
+                        animate={{ x: [0, 110, 0], y: [10, -15, 10] }}
+                        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                      >
+                        {/* 鏡片：外圈陰影把畫面其他部分變暗，像真拿放大鏡在照 */}
+                        <div
+                          className="w-16 h-16 rounded-full border-[5px] border-[#1d1d1f] bg-white/10"
+                          style={{ boxShadow: "0 0 0 9999px rgba(29,29,31,0.35)", marginLeft: -32, marginTop: -32 }}
+                        />
+                        {/* 鏡柄 */}
+                        <div className="w-1.5 h-10 bg-[#1d1d1f] rounded-full" style={{ transform: "rotate(45deg)", transformOrigin: "top left" }} />
+                      </motion.div>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[16px] font-semibold text-[#1d1d1f] mb-1">Inspector is examining your evidence…</p>
+                      <p className="text-[13px] text-[#86868b]">Looking for the {proof.sub.name} cancellation confirmation.</p>
+                    </div>
+                  </div>
+                )}
+
+                {proof.stage === "result" && (
+                  proof.aiError || !proof.verdict?.aiAvailable ? (
+                    <div className="text-center pt-10">
+                      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[#f5f5f7] flex items-center justify-center">
+                        <svg className="w-8 h-8 text-[#b25000]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">AI check unavailable</h3>
+                      <p className="text-[14px] text-[#86868b] leading-relaxed mb-7 max-w-[280px] mx-auto">
+                        We couldn&apos;t reach the AI checker right now. You can still submit your screenshot as proof.
+                      </p>
+                      <button onClick={() => setProof(p => (p ? { ...p, verified: "ai-down", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
+                    </div>
+                  ) : proof.verdict.passed ? (
+                    <div className="pt-6">
+                      {/* 截圖 + APPROVED 印章歪蓋，蓋下瞬間畫面震一下 */}
+                      <motion.div
+                        className="relative card p-3 mb-6 overflow-hidden"
+                        initial={{ x: 0 }}
+                        animate={{ x: [0, -6, 6, -4, 4, 0] }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <motion.div
+                            className="border-[5px] border-[#2e7d32] text-[#2e7d32] rounded-xl px-8 py-3 text-[24px] font-black tracking-[0.2em] rotate-[-12deg] bg-[#e8f5e9]/50"
+                            initial={{ scale: 2.5, opacity: 0, rotate: -18 }}
+                            animate={{ scale: 1, opacity: 1, rotate: -12 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 14 }}
+                          >
+                            APPROVED
+                          </motion.div>
+                        </div>
+                      </motion.div>
+                      <div className="text-center">
+                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Case closed</h3>
+                        <p className="text-[14px] text-[#86868b] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
+                        {proof.verdict.reason && (
+                          <p className="text-[12px] text-[#aeaeb2] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
+                        )}
+                      </div>
+                      <button onClick={() => setProof(p => (p ? { ...p, verified: "ai", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
+                    </div>
+                  ) : (
+                    <div className="pt-6">
+                      {/* 截圖 + REJECTED 印章退回 */}
+                      <motion.div
+                        className="relative card p-3 mb-6 overflow-hidden"
+                        initial={{ x: 0 }}
+                        animate={{ x: [0, -6, 6, -4, 4, 0] }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <motion.div
+                            className="border-[5px] border-[#d70015] text-[#d70015] rounded-xl px-6 py-3 text-[22px] font-black tracking-[0.15em] rotate-[8deg] bg-[#ffebee]/50"
+                            initial={{ scale: 2.5, opacity: 0, rotate: 14 }}
+                            animate={{ scale: 1, opacity: 1, rotate: 8 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 14 }}
+                          >
+                            REJECTED
+                          </motion.div>
+                        </div>
+                      </motion.div>
+                      <div className="text-center">
+                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Evidence rejected</h3>
+                        <p className="text-[14px] text-[#86868b] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
+                        {proof.verdict.reason && (
+                          <p className="text-[12px] text-[#aeaeb2] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
+                        )}
+                      </div>
+                      <button onClick={() => setProof(p => (p ? { ...p, stage: "select", verdict: null, aiError: false, line: "", image: null } : p))} className="btn-secondary text-[16px] py-4 w-full mb-3">Choose another screenshot</button>
+                      <button onClick={() => setProof(p => (p ? { ...p, verified: "skipped", stage: "confirm" } : p))} className="block mx-auto text-[13px] text-[#86868b] underline hover:text-[#1d1d1f] transition-colors">
+                        I did cancel it — skip AI check
+                      </button>
+                    </div>
+                  )
+                )}
+
+                {proof.stage === "confirm" && (
+                  <div className="pt-6">
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-1">Last step</h3>
+                    <p className="text-[13px] text-[#86868b] mb-6">Confirm all three before the hold button activates.</p>
+                    <div className="card p-0 overflow-hidden mb-7">
+                      {[
+                        `This screenshot is from ${proof.sub.name}`,
+                        "It shows the cancellation",
+                        `I have cancelled ${proof.sub.name}`,
+                      ].map((label, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setProof(p => (p ? { ...p, checks: p.checks.map((v, j) => (j === i ? !v : v)) as [boolean, boolean, boolean] } : p))}
+                          className={`w-full flex items-center justify-between gap-3 px-5 py-4 text-left ${i !== 2 ? 'border-b border-[#e5e5ea]' : ''}`}
+                        >
+                          <span className="text-[14px] text-[#1d1d1f]">{label}</span>
+                          <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-white text-[12px] flex-shrink-0 ${proof.checks[i] ? 'bg-[#2e7d32] border-[#2e7d32]' : 'border-[#d2d2d7]'}`}>
+                            {proof.checks[i] ? '✓' : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      disabled={!proof.checks.every(Boolean)}
+                      onPointerDown={startHold}
+                      onPointerUp={endHold}
+                      onPointerLeave={endHold}
+                      onPointerCancel={endHold}
+                      className={`relative w-full py-5 rounded-2xl text-white text-[16px] font-semibold overflow-hidden select-none active:scale-[0.99] transition-colors ${proof.checks.every(Boolean) ? 'bg-[#d70015]' : 'bg-[#d2d2d7]'}`}
+                    >
+                      <span className="relative z-10">
+                        {!proof.checks.every(Boolean)
+                          ? "Check all three to continue"
+                          : proof.hold > 0
+                            ? `Keep holding — ${Math.ceil((1 - proof.hold) * 3)}s`
+                            : "Hold 3s to confirm cancellation"}
+                      </span>
+                      <span
+                        className="absolute inset-y-0 left-0 bg-white/25"
+                        style={{ width: `${proof.hold * 100}%` }}
+                      />
+                    </button>
+                    <p className="text-[12px] text-[#aeaeb2] mt-4 text-center">
+                      {proof.verified === "skipped" ? "AI check skipped at your request." : "This is a binding confirmation of your cancellation."}
+                    </p>
+                  </div>
+                )}
+
+                {proof.stage === "done" && (
+                  <div className="flex flex-col items-center pt-24">
+                    <motion.div
+                      initial={{ scale: 3, opacity: 0, rotate: -30 }}
+                      animate={{ scale: 1, opacity: 1, rotate: -10 }}
+                      transition={{ type: "spring", stiffness: 250, damping: 14 }}
+                    >
+                      <div className="border-4 border-[#d70015] text-[#d70015] rounded-xl px-10 py-4 text-[26px] font-black tracking-[0.2em] shadow-lg">
+                        CANCELLED
+                      </div>
+                    </motion.div>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-[14px] text-[#86868b] mt-6"
+                    >
+                      {proof.sub.name} is cancelled. Proof saved.
+                    </motion.p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* 證據檢視器：全屏回看取消截圖 */}
+        <AnimatePresence>
+          {proofViewer && (
+            <motion.div
+              className="fixed inset-0 z-[70] bg-black/95 flex flex-col"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="flex items-center justify-between px-6 pt-6 pb-3">
+                <p className="text-[14px] font-semibold text-white">Proof — {proofViewer.name}</p>
+                <button onClick={() => setProofViewer(null)} className="text-white/70 text-[26px] leading-none px-2 hover:text-white transition-colors">&times;</button>
+              </div>
+              <div className="flex-1 flex items-center justify-center px-4 pb-10 overflow-hidden">
+                <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Add modal */}
         <AnimatePresence>
@@ -1241,9 +2080,22 @@ export default function AppPage() {
                     </select>
                   </div>
                   <input className="input-apple" type="date" value={form.nextDate} onChange={(e) => setForm((f) => ({ ...f, nextDate: e.target.value }))} />
+                  <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
+                    <input type="checkbox" checked={form.isTrial} onChange={(e) => setForm((f) => ({ ...f, isTrial: e.target.checked }))} className="w-4 h-4 accent-[#e65100]" />
+                    <span className="text-[14px] text-[#1d1d1f] font-medium">This is a free trial</span>
+                  </label>
+                  {form.isTrial && (
+                    <div className="space-y-3 pt-1">
+                      <div>
+                        <label className="text-[12px] text-[#86868b] mb-1 block">Trial ends</label>
+                        <input className="input-apple" type="date" value={form.trialEnd} onChange={(e) => setForm((f) => ({ ...f, trialEnd: e.target.value }))} />
+                      </div>
+                      <p className="text-[12px] text-[#aeaeb2] leading-relaxed">Amount above is charged after the trial ends.</p>
+                    </div>
+                  )}
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Cancel</button>
-                    <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount}>Add</button>
+                    <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount || (form.isTrial && !form.trialEnd)}>Add</button>
                   </div>
                 </div>
               </motion.div>
@@ -1292,14 +2144,25 @@ export default function AppPage() {
                   onClick={() => {
                     setShowTrustModal(false);
                     // Now do the actual redirect
-                    const redirectUri = window.location.origin + "/app";
+                    // Google 只認可已登記的網域（oopssubs.com），localhost 無法登記。
+                    // App 內（localhost）透過 oopssubs.com/oauth-app 中轉，該頁會把
+                    // token 透過 App 專屬通道（com.oopssubs.app://）跳回 App。
+                    const redirectUri = isNativeApp()
+                      ? "https://oopssubs.com/oauth-app"
+                      : window.location.origin + "/app";
                     const authUrl = "https://accounts.google.com/o/oauth2/v2/auth?" +
                       "client_id=" + encodeURIComponent(CLIENT_ID) +
                       "&redirect_uri=" + encodeURIComponent(redirectUri) +
                       "&response_type=token" +
                       "&scope=" + encodeURIComponent(GMAIL_SCOPES) +
                       "&state=scan&prompt=consent";
-                    window.location.href = authUrl;
+                    if (isNativeApp()) {
+                      // Google 封鎖 App 內嵌瀏覽器登入（安全政策）——App 必須跳出到
+                      // 系統瀏覽器（Custom Tab）完成授權，再經 deep link 跳回。
+                      Browser.open({ url: authUrl });
+                    } else {
+                      window.location.href = authUrl;
+                    }
                   }}
                   className="btn-primary w-full text-[17px] font-semibold py-4"
                 >
@@ -1331,7 +2194,10 @@ export default function AppPage() {
                   <p className="text-[36px] font-extrabold tracking-[-0.02em]">$9.99</p>
                   <p className="text-[13px] text-[#86868b]">one-time · no subscription</p>
                 </div>
-                <a href="/pricing" className="btn-primary w-full mb-3">Get OopsSubs Pro</a>
+                <button onClick={handleBuyPro} disabled={buying} className="btn-primary w-full mb-3 disabled:opacity-50">
+                  {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
+                </button>
+                {buyError && <p className="text-[13px] text-red-600 mb-3 text-center">{buyError}</p>}
                 <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[#86868b] w-full text-center">Maybe later</button>
               </motion.div>
             </div>

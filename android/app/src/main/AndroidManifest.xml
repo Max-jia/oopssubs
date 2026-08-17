@@ -22,6 +22,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- OAuth deep link：Google 授權經中轉頁跳回 App（com.oopssubs.app://oauth#access_token=...） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.oopssubs.app" />
+            </intent-filter>
+
         </activity>
 
         <provider

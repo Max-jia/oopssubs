@@ -1,7 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { isNativeApp } from "@/lib/purchases";
+import { cancelGuides } from "@/data/cancel-guides";
+
+// Native app shell needs the file URL (its local server can't resolve clean routes);
+// the website uses the clean route.
+// SSR 期間偵測不到 App（伺服器端沒有 window），網址會先烘培成網頁版，
+// 元件內會在 hydrate 後用 isNative 重算。
+function appHref(action: string, isNative: boolean): string {
+  return isNative ? `/app/index.html#action=${action}` : `/app/#action=${action}`;
+}
 
 const guides = [
   { slug: 'netflix', name: 'Netflix', difficulty: 'easy' as const },
@@ -25,6 +36,11 @@ const iconPaths = {
 };
 
 export default function HomePage() {
+  // App 偵測要等 Capacitor bridge 注入才可靠，先預設網頁版，載入後立即重算
+  const [isNative, setIsNative] = useState(false);
+  useEffect(() => {
+    setIsNative(isNativeApp());
+  }, []);
   return (
     <main className="min-h-screen animate-fade-in">
       {/* Hero */}
@@ -57,7 +73,7 @@ export default function HomePage() {
           Stop bleeding<br />on subscriptions
         </motion.h1>
         <p className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto">
-          OopsSubs is a subscription management application. OopsSubs helps users find and cancel forgotten subscriptions by scanning their email inbox for receipts, renewal notices, and free trials.
+          Find and cancel forgotten subscriptions<br />from your email inbox.
         </p>
         <motion.p
           className="text-[13px] text-[#aeaeb2] mb-10 max-w-xs mx-auto"
@@ -65,11 +81,16 @@ export default function HomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.5 }}
         >
-          🔒 No server. No database. Your data stays on your device.
+          <span className="inline-flex items-center gap-1.5">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            No server. No database. Your data stays on your device.
+          </span>
         </motion.p>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
-            href="/app?action=manual"
+            href={appHref("manual", isNative)}
             className="btn-primary text-[17px] font-semibold py-4 w-full"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.02 }}
@@ -86,7 +107,7 @@ export default function HomePage() {
             Add subscriptions manually
           </motion.a>
           <motion.a
-            href="/app?action=scan"
+            href={appHref("scan", isNative)}
             className="btn-secondary text-[17px] py-4 w-full"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.02, y: -2 }}
@@ -103,6 +124,13 @@ export default function HomePage() {
             Connect Gmail to scan
           </motion.a>
         </div>
+        <motion.a
+          href={appHref("list", isNative)}
+          className="block text-center text-[13px] text-[#86868b] mt-5 hover:text-[#1d1d1f] transition-colors"
+          whileTap={{ scale: 0.95 }}
+        >
+          View my subscriptions →
+        </motion.a>
       </div>
 
       {/* Cancel guides section */}
@@ -127,7 +155,7 @@ export default function HomePage() {
           ))}
         </div>
         <Link href="/cancel" className="block text-center text-[13px] text-[#86868b] mt-5 hover:text-[#1d1d1f] transition-colors">
-          View all 79 services →
+          View all {cancelGuides.length} services →
         </Link>
       </div>
 
@@ -139,9 +167,9 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
           </div>
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">No server. No database. No tracking.</h3>
+          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Private by design</h3>
           <p className="text-[13px] text-[#86868b] leading-relaxed">
-            Your subscription list and Gmail token live on your device. We can&apos;t see your data because we never store it.
+            Your subscriptions and Gmail token live only on your phone. Nothing is stored, tracked, or uploaded.
           </p>
         </div>
       </div>

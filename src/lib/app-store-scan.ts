@@ -31,3 +31,8 @@ export function isNativeIOS(): boolean {
   if (typeof window === "undefined") return false;
   return (window as any).Capacitor?.getPlatform() === "ios";
 }
+
+export function isMobileWeb(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}

@@ -13,7 +13,10 @@ public class PlayStoreSubsPlugin extends Plugin {
     public void getSubscriptions(PluginCall call) {
         com.android.billingclient.api.BillingClient billingClient =
             com.android.billingclient.api.BillingClient.newBuilder(getContext())
-                .enablePendingPurchases()
+                .enablePendingPurchases(
+                    com.android.billingclient.api.PendingPurchasesParams.newBuilder()
+                        .enableOneTimeProducts()
+                        .build())
                 .build();
 
         billingClient.startConnection(new com.android.billingclient.api.BillingClientStateListener() {

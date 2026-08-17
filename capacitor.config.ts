@@ -11,6 +11,10 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'always',
   },
+  android: {
+    // 診斷用：開啟 WebView 除錯（上架前要關掉）
+    webContentsDebuggingEnabled: true,
+  },
 };
 
 export default config;

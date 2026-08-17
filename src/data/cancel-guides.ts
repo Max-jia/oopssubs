@@ -36,6 +36,19 @@ export const cancelGuides: CancelGuide[] = [
     warning: 'You\'ll lose downloaded songs. Playlists and saved music stay on the free tier.',
   },
   {
+    slug: 'gemini',
+    name: 'Gemini',
+    difficulty: 'easy',
+    directLink: 'https://one.google.com',
+    steps: [
+      'Go to one.google.com and sign in with the Google account that pays for Gemini',
+      'Under "Subscriptions", find Gemini (AI Pro) and click "Manage"',
+      'Click "Cancel subscription"',
+      'Pick a reason (optional) and confirm',
+    ],
+    warning: 'You can keep using Gemini until the end of your billing period. If you were billed through Google Play, cancel under play.google.com/store/account/subscriptions instead.',
+  },
+  {
     slug: 'amazon-prime',
     name: 'Amazon Prime',
     difficulty: 'medium',

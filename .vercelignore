@@ -1,0 +1,7 @@
+# App-native files — not part of the website deployment
+android/
+*.apk
+
+# Standard ignores (Vercel also excludes these by default)
+node_modules/
+.git/

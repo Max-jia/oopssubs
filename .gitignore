@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+service-account*.json
+.gstack/
+
+# 建置產物
+*.apk
+*.aab
+app-release-v2/
+
+# 機密憑證（Gmail 服務帳號私鑰）
+oopssubs-*.json
+
+# 錄屏與審查截圖
+*.mov
+ui-review/
+
+# checkout-api 依賴
+checkout-api/node_modules/

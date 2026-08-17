@@ -7,6 +7,8 @@ export default function InstallPrompt() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    // 在 App（Capacitor）裡不顯示——App 本身就是安裝好的，不用再加到主畫面
+    if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform?.()) return;
     // Don't show if already in standalone (installed) mode
     if (window.matchMedia("(display-mode: standalone)").matches) return;
     // Don't show on desktop
