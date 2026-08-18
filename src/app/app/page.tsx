@@ -1539,6 +1539,12 @@ export default function AppPage() {
 
   const monthTotal = totalMonthly(subs);
   const urgentSubs = subs.filter(s => daysUntil(s.nextDate) === 1);
+  // 橫幅排隊:一次只顯示最急的一塊(trial 明天扣錢 > urgent 明天扣錢 > 追債 > 週檢)
+  const bannerPriority = trialAlert ? 'trial'
+    : urgentSubs.filter(s => !dismissedUrgent.includes(s.id)).length > 0 ? 'urgent'
+    : pendingProofs.length > 0 ? 'proof'
+    : showWeekly ? 'weekly'
+    : null;
   const [dismissedUrgent, setDismissedUrgent] = useState<string[]>([]);
 
   if (!mounted) return null;
@@ -1548,8 +1554,8 @@ export default function AppPage() {
       <Script src="https://apis.google.com/js/api.js" />
       <Script src="https://accounts.google.com/gsi/client" />
 
-      {/* Renewal alert banner */}
-      {urgentSubs.filter(s => !dismissedUrgent.includes(s.id)).map(s => (
+      {/* Renewal alert banner(僅當它是最高優先級) */}
+      {bannerPriority === 'urgent' && urgentSubs.filter(s => !dismissedUrgent.includes(s.id)).map(s => (
         <motion.div
           key={s.id}
           initial={{ y: -60, opacity: 0 }}
@@ -1801,7 +1807,7 @@ export default function AppPage() {
           <div className="animate-slide-down">
             {/* Trial expiring banner */}
             <AnimatePresence>
-              {trialAlert && (
+              {bannerPriority === 'trial' && trialAlert && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1846,7 +1852,7 @@ export default function AppPage() {
 
             {/* Weekly checkup banner */}
             <AnimatePresence>
-              {showWeekly && (
+              {bannerPriority === 'weekly' && showWeekly && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1870,7 +1876,7 @@ export default function AppPage() {
             </AnimatePresence>
 
             {/* 未交取消證據的追債提醒：天數越高動效越煩人，直到交證據 */}
-            {pendingProofs.map((p) => {
+            {bannerPriority === 'proof' && pendingProofs.map((p) => {
               const sub = subs.find(s => s.id === p.subId);
               if (!sub) return null;
               return <DebtCard key={p.subId} p={p} onOpen={() => openProofFlow(sub)} />;
