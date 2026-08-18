@@ -1008,6 +1008,16 @@ export default function AppPage() {
   const [buyError, setBuyError] = useState("");
   const [restoring, setRestoring] = useState(false);
   // 首次看到列表時,第一行自動演示一次左滑教學
+  // 全局錯誤捕獲:崩潰時把具體錯誤顯示在畫面上(用戶可原文回報,協助遠端排查)
+  const [fatalError, setFatalError] = useState<string | null>(null);
+  useEffect(() => {
+    const onErr = (e: ErrorEvent) => setFatalError(e.message || String(e.error));
+    const onRej = (e: PromiseRejectionEvent) => setFatalError(String(e.reason?.message || e.reason));
+    window.addEventListener("error", onErr);
+    window.addEventListener("unhandledrejection", onRej);
+    return () => { window.removeEventListener("error", onErr); window.removeEventListener("unhandledrejection", onRej); };
+  }, []);
+
   // 首次看到列表時,第一行進入視口才演示左滑(標記在視口觸發時寫入)
   const [swipeHint, setSwipeHint] = useState(false);
   // 退場動效:正在滑出的訂閱行
@@ -2387,6 +2397,21 @@ export default function AppPage() {
             </div>
           )}
         </AnimatePresence>
+      {/* 全局錯誤顯示:崩潰原因直接印出來 */}
+      {fatalError && (
+        <div className="fixed inset-0 z-[90] bg-[var(--bg)] flex items-center justify-center p-8">
+          <div className="text-center max-w-xs">
+            <p className="text-[13px] text-[var(--red)] font-semibold mb-2">Something went wrong</p>
+            <p className="text-[14px] text-[var(--text)] leading-relaxed break-all">{fatalError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-primary w-full mt-6"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      )}
       </main>
     </>
   );
