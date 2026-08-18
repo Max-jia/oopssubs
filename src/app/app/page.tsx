@@ -1588,7 +1588,12 @@ export default function AppPage() {
               onClick={() => {
                 savePendingCancel({ subId: s.id, name: s.name, timestamp: Date.now() });
                 const cancelSlug = cancelSlugFor(s.name);
-                window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
+                if (isNativeApp()) {
+                  // App WebView 不支援 window.open('_blank'),直接導航
+                  window.location.href = cancelSlug ? `/cancel/${cancelSlug}` : '/cancel';
+                } else {
+                  window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
+                }
               }}
               className="flex-shrink-0 bg-[var(--red)] text-[var(--bg)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
