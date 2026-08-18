@@ -1010,6 +1010,12 @@ export default function AppPage() {
   // 首次看到列表時,第一行自動演示一次左滑教學
   // 全局錯誤捕獲:崩潰時把具體錯誤顯示在畫面上(用戶可原文回報,協助遠端排查)
   const [fatalError, setFatalError] = useState<string | null>(null);
+  // App(WebView)不需要 Service Worker——殘留的 SW 會快取舊 chunk 導致載入崩潰,主動卸載
+  useEffect(() => {
+    if (isNativeApp() && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+    }
+  }, []);
   useEffect(() => {
     const onErr = (e: ErrorEvent) => setFatalError(e.message || String(e.error));
     const onRej = (e: PromiseRejectionEvent) => setFatalError(String(e.reason?.message || e.reason));
@@ -1548,6 +1554,7 @@ export default function AppPage() {
   }, []);
 
   const monthTotal = totalMonthly(subs);
+  const [dismissedUrgent, setDismissedUrgent] = useState<string[]>([]);
   const urgentSubs = subs.filter(s => daysUntil(s.nextDate) === 1);
   // 橫幅排隊:一次只顯示最急的一塊(trial 明天扣錢 > urgent 明天扣錢 > 追債 > 週檢)
   const bannerPriority = trialAlert ? 'trial'
@@ -1555,7 +1562,7 @@ export default function AppPage() {
     : pendingProofs.length > 0 ? 'proof'
     : showWeekly ? 'weekly'
     : null;
-  const [dismissedUrgent, setDismissedUrgent] = useState<string[]>([]);
+
 
   if (!mounted) return null;
 
