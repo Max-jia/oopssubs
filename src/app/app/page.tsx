@@ -1017,8 +1017,19 @@ export default function AppPage() {
     }
   }, []);
   useEffect(() => {
-    const onErr = (e: ErrorEvent) => setFatalError(e.message || String(e.error));
-    const onRej = (e: PromiseRejectionEvent) => setFatalError(String(e.reason?.message || e.reason));
+    const isNoise = (m: string) =>
+      m.includes("Not implemented on web") ||  // RevenueCat 在 web 環境的已知噪音
+      m.includes("unimplemented");
+    const onErr = (e: ErrorEvent) => {
+      const msg = e.message || String(e.error);
+      if (isNoise(msg)) return;
+      setFatalError(msg);
+    };
+    const onRej = (e: PromiseRejectionEvent) => {
+      const msg = String(e.reason?.message || e.reason);
+      if (isNoise(msg)) return;
+      setFatalError(msg);
+    };
     window.addEventListener("error", onErr);
     window.addEventListener("unhandledrejection", onRej);
     return () => { window.removeEventListener("error", onErr); window.removeEventListener("unhandledrejection", onRej); };
@@ -2415,12 +2426,20 @@ export default function AppPage() {
           <div className="text-center max-w-xs">
             <p className="text-[13px] text-[var(--red)] font-semibold mb-2">Something went wrong</p>
             <p className="text-[14px] text-[var(--text)] leading-relaxed break-all">{fatalError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="btn-primary w-full mt-6"
-            >
-              Reload
-            </button>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setFatalError(null)}
+                className="btn-secondary flex-1"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="btn-primary flex-1"
+              >
+                Reload
+              </button>
+            </div>
           </div>
         </div>
       )}
