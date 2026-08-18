@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { buyPro, isNativeApp } from "@/lib/purchases";
+import { enableRipple } from "@/lib/ripple";
 import { cancelGuides } from "@/data/cancel-guides";
 
 export default function PricingPage() {
@@ -18,6 +19,8 @@ export default function PricingPage() {
     if (res.ok) setPurchased(true);
     else if (!res.cancelled) setBuyError("Purchase failed. Please try again.");
   };
+
+  useEffect(() => { enableRipple(); }, []);
 
   return (
     <main className="min-h-screen max-w-md mx-auto px-6 py-12 animate-fade-in">

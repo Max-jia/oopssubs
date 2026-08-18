@@ -28,6 +28,8 @@
   --divider: #2C2C30;
   --skeleton-hi: #26262A;
   --skeleton-lo: #1C1C1F;
+  --text-on-card: rgba(10, 10, 12, 0.45);
+  --text-on-card-strong: rgba(10, 10, 12, 0.6);
 }
 
 @layer base {
@@ -43,7 +45,7 @@
 @layer components {
   /* ── Primary button ── */
   .btn-primary {
-    @apply relative bg-[var(--text)] text-[var(--bg)] px-6 py-3.5 rounded-full font-semibold
+    @apply relative overflow-hidden bg-[var(--text)] text-[var(--bg)] px-6 py-3.5 rounded-full font-semibold
            active:scale-[0.94] active:bg-[#FFFFFF]
            transition-[transform,background-color] duration-[300ms]
            disabled:opacity-40 disabled:cursor-not-allowed
@@ -52,7 +54,7 @@
 
   /* ── Secondary button ── */
   .btn-secondary {
-    @apply bg-[var(--bg-hover)] text-[var(--text)] px-6 py-3.5 rounded-full font-semibold
+    @apply relative overflow-hidden bg-[var(--bg-hover)] text-[var(--text)] px-6 py-3.5 rounded-full font-semibold
            border border-[var(--border)]
            active:scale-[0.94] active:bg-[var(--bg-active)]
            transition-[transform,background-color] duration-[300ms]
@@ -132,6 +134,8 @@
 
   .divider { @apply h-px bg-[var(--divider)] my-4; }
   .nav-link { @apply text-[13px] text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors duration-200; }
+
+  /* ── 點擊漣漪(主/次按鈕) ── */
 }
 
 /* ── Keyframes ── */
@@ -255,6 +259,14 @@
 .animate-pop-in { animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-bounce-up { animation: bounce-up 0.6s ease-out; }
 
+/* ── 列表行退場(取消成功時滑出) ── */
+@keyframes rowLeave {
+  0% { opacity: 1; transform: translateX(0); background-color: rgba(48, 209, 88, 0.16); }
+  35% { background-color: rgba(48, 209, 88, 0.22); }
+  100% { opacity: 0; transform: translateX(130px); background-color: rgba(48, 209, 88, 0.22); }
+}
+.row-leaving { animation: rowLeave 0.35s ease-in forwards; }
+
 /* ── Page transitions ── */
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(20px); }
@@ -300,6 +312,21 @@
 .tap-ripple:active::before {
   opacity: 1;
   transition: opacity 0s;
+}
+
+/* ── 點擊漣漪(JS 注入 span,從點擊點擴散) ── */
+.ripple-fx {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(0,0,0,0.4) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  animation: rippleBurst 0.5s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes rippleBurst {
+  to { transform: translate(-50%, -50%) scale(9); opacity: 0; }
 }
 
 /* ── Number ticker ── */

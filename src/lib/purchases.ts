@@ -113,3 +113,18 @@ export async function handleStripeReturn(): Promise<boolean> {
   }
   return false;
 }
+
+// 還原購買:買過 Pro 但 App 沒認出(身份漂移/重裝)時,用戶點「Restore purchases」恢復
+export async function restorePro(): Promise<{ ok: boolean; error?: string }> {
+  if (!isNativeApp()) {
+    // 網站版:回到 checkWebPro(Stripe 已驗證的本地狀態)
+    return { ok: checkWebPro() };
+  }
+  try {
+    const { customerInfo } = await Purchases.restorePurchases();
+    if (customerInfo.entitlements.active[ENTITLEMENT_ID]) return { ok: true };
+    return { ok: false, error: "no-entitlement" };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}

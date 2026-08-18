@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
-import { initPurchases, checkPro, buyPro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
+import { initPurchases, checkPro, buyPro, restorePro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
+import { enableRipple } from "@/lib/ripple";
 import { cancelGuides } from "@/data/cancel-guides";
 import { Browser } from "@capacitor/browser";
 import { App as CapApp } from "@capacitor/app";
@@ -182,7 +183,7 @@ function DebtCard({ p, onOpen }: { p: PendingProof; onOpen: () => void }) {
   const level = debtLevel(days);
   const pool = DEBT_LINES[level];
   const [line, setLine] = useState(() => pool[Math.floor(Math.random() * pool.length)]);
-  useEffect(() => {
+  useEffect(() => { enableRipple();
     const t = setInterval(() => setLine(pool[Math.floor(Math.random() * pool.length)]), 4000);
     return () => clearInterval(t);
   }, [level]);
@@ -220,7 +221,7 @@ function DebtCard({ p, onOpen }: { p: PendingProof; onOpen: () => void }) {
             DAY {days}
           </motion.p>
           <p className="text-[16px] font-semibold text-[var(--bg)] mt-1">{p.name}</p>
-          <p className="text-[13px] text-[var(--bg)]/45 min-h-[18px] mt-0.5 mb-4">{line}</p>
+          <p className="text-[13px] text-[var(--text-on-card)] min-h-[18px] mt-0.5 mb-4">{line}</p>
           <button
             onClick={onOpen}
             className="w-full bg-[var(--amber)] text-[var(--bg)] text-[15px] font-semibold py-3 rounded-xl active:scale-[0.98] transition-transform"
@@ -272,6 +273,11 @@ function loadSubs(): Subscription[] {
   catch { return []; }
 }
 function saveSubs(subs: Subscription[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(subs)); }
+// 去重檢查:同名(忽略大小寫與首尾空格)視為已存在
+function hasDuplicate(subs: Subscription[], name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return subs.some(s => s.name.trim().toLowerCase() === n);
+}
 function monthlyEquivalent(sub: Subscription): number {
   if (sub.cycle === "yearly") return sub.amount / 12;
   if (sub.cycle === "quarterly") return sub.amount / 3;
@@ -282,6 +288,30 @@ function totalMonthly(subs: Subscription[]): number {
 }
 // 點擊微互動：Android WebView 支援 vibrate,網站自動忽略
 function buzz(ms = 30) { try { navigator.vibrate?.(ms); } catch { /* noop */ } }
+
+/* 數字滾動:值變化時從舊值滑到新值(省錢 App 的「加油機」效果) */
+function AnimatedNumber({ value, className }: { value: number; className?: string }) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = value;
+    if (from === to) return;
+    prevRef.current = to;
+    const start = performance.now();
+    const dur = 900;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(from + (to - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <p className={className}>{fmtCurrency(display)}</p>;
+}
 
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
@@ -845,7 +875,7 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        <span className={`text-[12px] font-medium px-2.5 py-1 rounded-full ${urgency}`}>
+        <span key={days} className={`text-[12px] font-medium px-2.5 py-1 rounded-full badge-pop ${urgency}`}>
           {days <= 0 ? (sub.isTrial ? "Trial ended" : "Due") : sub.isTrial ? `${days}d left` : days === 1 ? "Tmrw" : `${days}d`}
         </span>
         <button
@@ -862,8 +892,96 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
           )}
         </button>
-        <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-[var(--text-tertiary)] hover:text-[var(--red)] transition-all duration-200 text-lg leading-none w-6 h-6 rounded-full hover:bg-[var(--red-dim)] flex items-center justify-center">&times;</button>
       </div>
+    </div>
+  );
+}
+
+/* ── 可左滑行：左滑露出 Cancel，滑過一半卡住，點 Cancel 才執行；首次顯示教學動畫 ── */
+const SWIPE_HINT_KEY = "oopssubs_swipe_hint";
+
+function SwipeableRow({ index, last, hint, leaving, onHintShown, onCancel, children }: {
+  index: number;
+  last: boolean;
+  hint: boolean;
+  leaving: boolean;
+  onHintShown: () => void;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [teaching, setTeaching] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // 首次進入視口 → 播放教學動畫 + 標籤(只一次)
+  useEffect(() => {
+    if (!hint || teaching) return;
+    const el = rowRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      setTeaching(true);
+      onHintShown();
+      try { localStorage.setItem(SWIPE_HINT_KEY, "1"); } catch { /* noop */ }
+      try { navigator.vibrate?.(10); } catch { /* noop */ }
+      io.disconnect();
+    }, { threshold: 0.3 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hint, teaching]);
+  // teaching 變 true 時啟動隱藏計時(獨立 effect,避免 cleanup 干擾)
+  useEffect(() => {
+    if (!teaching) return;
+    const t = setTimeout(() => setTeaching(false), 4200);
+    return () => clearTimeout(t);
+  }, [teaching]);
+  return (
+    <div className={`relative overflow-hidden ${last ? '' : 'border-b border-[var(--divider)]'}`}>
+      {/* 首次使用教學提示(進入視口才出現) */}
+      {teaching && (
+        <div className="absolute top-2 right-4 z-10 bg-[var(--bg)] text-[var(--text)] text-[11px] font-medium px-2.5 py-1 rounded-full shadow-lg animate-fade-in">
+          Swipe left to cancel
+        </div>
+      )}
+      {/* 左滑露出的取消底層（點擊才執行） */}
+      <div className="absolute inset-y-0 right-0 w-24 z-0 bg-[var(--red)] flex items-center justify-center">
+        <button
+          onClick={onCancel}
+          className="text-[var(--bg)] text-[13px] font-semibold tracking-wide active:scale-95 transition-transform"
+        >
+          Cancel
+        </button>
+      </div>
+      <motion.div
+        ref={rowRef}
+        initial={{ opacity: 0, x: -20 }}
+        animate={{
+          opacity: 1,
+          x: teaching ? [0, -44, 0, -44, 0] : open ? -88 : 0,
+        }}
+        transition={
+          teaching
+            ? { duration: 1.6, times: [0, 0.2, 0.5, 0.7, 1], ease: "easeInOut" }
+            : { type: "spring", stiffness: 400, damping: 30 }
+        }
+        className={`relative z-[1] bg-[var(--bg-elevated)] ${leaving ? 'row-leaving' : ''}`}
+        layout
+        drag={teaching ? false : "x"}
+        dragConstraints={{ left: -88, right: 0 }}
+        dragElastic={0.1}
+        whileDrag={{ scale: 0.98, opacity: 0.95 }}
+        onDragEnd={(e, info) => {
+          if (open) { setOpen(false); return; }
+          if (info.offset.x < -44 || info.velocity.x < -400) {
+            setOpen(true);
+            try { navigator.vibrate?.(15); } catch { /* noop */ }
+          } else {
+            setOpen(false);
+          }
+        }}
+        onClick={() => { if (open) setOpen(false); }}
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }
@@ -888,6 +1006,17 @@ export default function AppPage() {
   const [showTrustModal, setShowTrustModal] = useState(false);
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState("");
+  const [restoring, setRestoring] = useState(false);
+  // 首次看到列表時,第一行自動演示一次左滑教學
+  // 首次看到列表時,第一行進入視口才演示左滑(標記在視口觸發時寫入)
+  const [swipeHint, setSwipeHint] = useState(false);
+  // 退場動效:正在滑出的訂閱行
+  const [leaving, setLeaving] = useState<string | null>(null);
+  useEffect(() => {
+    if (subs.length > 0 && typeof window !== "undefined" && !localStorage.getItem(SWIPE_HINT_KEY)) {
+      setSwipeHint(true);
+    }
+  }, [subs.length]);
 
   // 取消證據流程（取消證明制：沒交截圖證明，取消提醒會一直持續）
   const [proof, setProof] = useState<{
@@ -1021,7 +1150,7 @@ export default function AppPage() {
       }
     } else if (action === 'manual') {
       // Free limit reached → paywall straight away, no empty form filling
-      if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true);
+      if (!pro && subs.length >= FREE_LIMIT) openPaywallIfNeeded();
       else setShowAdd(true);
     }
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1174,9 +1303,24 @@ export default function AppPage() {
     setTrialAlert(null);
   }, [subs, trialAlert]);
 
-  const addSub = useCallback(() => {
+  // 付費牆前重查購買狀態:已買過就解鎖不彈窗(防止 pro 狀態過期誤彈)
+  const openPaywallIfNeeded = useCallback(async (): Promise<boolean> => {
+    if (subs.length < FREE_LIMIT) return false;
+    if (pro) return false;
+    const isPro = await checkPro();
+    if (isPro) { setPro(true); return false; }
+    setShowPaywall(true);
+    return true;
+  }, [subs, pro]);
+
+  const addSub = useCallback(async () => {
     if (!form.name || !form.amount) return;
-    if (!pro && subs.length >= FREE_LIMIT) { setShowPaywall(true); return; }
+    if (hasDuplicate(subs, form.name)) {
+      setError(`"${form.name.trim()}" is already on your list.`);
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    if (await openPaywallIfNeeded()) return;
     const sub: Subscription = {
       id: uuid(), name: form.name.trim(), amount: parseFloat(form.amount),
       cycle: form.cycle,
@@ -1189,6 +1333,14 @@ export default function AppPage() {
     setForm({ name: "", amount: "", cycle: "monthly", nextDate: "", isTrial: false, trialEnd: "" }); setShowAdd(false);
   }, [form, subs, pro]);
 
+  const handleRestore = useCallback(async () => {
+    setRestoring(true); setBuyError("");
+    const res = await restorePro();
+    setRestoring(false);
+    if (res.ok) { setPro(true); setShowPaywall(false); }
+    else setBuyError(res.error === "no-entitlement" ? "No previous purchase found on this account." : "Restore failed. Please try again.");
+  }, []);
+
   const handleBuyPro = useCallback(async () => {
     setBuying(true); setBuyError("");
     const res = await buyPro();
@@ -1199,10 +1351,15 @@ export default function AppPage() {
 
   const deleteSub = useCallback((id: string, proofRec?: ProofRecord) => {
     const deleted = subs.find(s => s.id === id);
-    if (deleted) addCancelled(deleted, proofRec);
-    const updated = subs.filter((s) => s.id !== id);
-    setSubs(updated); saveSubs(updated);
-    if (deleted) { setCelebration({ name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString() }); setTimeout(() => setCelebration(null), 5000); }
+    // 先播退場動畫(卡片滑出),280ms 後才真正刪除
+    setLeaving(id);
+    setTimeout(() => {
+      if (deleted) addCancelled(deleted, proofRec);
+      const updated = subs.filter((s) => s.id !== id);
+      setSubs(updated); saveSubs(updated);
+      setLeaving(null);
+      if (deleted) { setCelebration({ name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString() }); setTimeout(() => setCelebration(null), 5000); }
+    }, 280);
   }, [subs]);
 
   /* ── 取消證據流程 ── */
@@ -1356,8 +1513,13 @@ export default function AppPage() {
     } catch (e: any) { scanningRef.current = false; clearTimeout(timeout); setError(e.message || "Connection failed."); setScanning(false); }
   }, []);
 
-  const confirmScanned = useCallback((item: ScannedSub, idx: number) => {
-    if (!pro && subs.length >= FREE_LIMIT) { setShowPaywall(true); return; }
+  const confirmScanned = useCallback(async (item: ScannedSub, idx: number) => {
+    if (hasDuplicate(subs, item.name)) {
+      setError(`"${item.name}" is already on your list.`);
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
+    if (await openPaywallIfNeeded()) return;
     const nextDate = item.trialEnd
       ? item.trialEnd
       : new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
@@ -1396,7 +1558,7 @@ export default function AppPage() {
         >
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] text-[var(--bg)]/60 mb-0.5">Renews tomorrow</p>
+              <p className="text-[13px] text-[var(--text-on-card-strong)] mb-0.5">Renews tomorrow</p>
               <p className="text-[17px] font-semibold truncate">{s.name} · {fmtCurrency(s.amount)}</p>
             </div>
             <button
@@ -1405,11 +1567,11 @@ export default function AppPage() {
                 const cancelSlug = cancelSlugFor(s.name);
                 window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
               }}
-              className="flex-shrink-0 bg-white text-[var(--text)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
+              className="flex-shrink-0 bg-[var(--red)] text-[var(--bg)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
               Cancel now
             </button>
-            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--bg)]/40 hover:text-[var(--bg)] text-lg">&times;</button>
+            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--text-tertiary)] hover:text-[var(--text)] text-lg">&times;</button>
           </div>
         </motion.div>
       ))}
@@ -1456,7 +1618,7 @@ export default function AppPage() {
         {lifetimeSavings() > 0 && (
           <div className="text-center mb-8">
             <p className="text-[12px] text-[var(--text-secondary)] uppercase tracking-[0.05em]">Lifetime saved</p>
-            <p className="text-[28px] font-extrabold tracking-[-0.02em] text-[var(--green)]">{fmtCurrency(lifetimeSavings())}</p>
+            <AnimatedNumber value={lifetimeSavings()} className="text-[28px] font-extrabold tracking-[-0.02em] text-[var(--green)]" />
             <button
               onClick={() => {
                 const cancelled = getCancelled().slice(-5).map(c => `${c.name} ${fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr`).join(', ');
@@ -1486,7 +1648,7 @@ export default function AppPage() {
               </span>
               <div className="flex-1">
                 <p className="text-[14px] font-semibold">Cancelled {celebration.name}!</p>
-                <p className="text-[13px] text-[var(--bg)]/60">
+                <p className="text-[13px] text-[var(--text-on-card-strong)]">
                   You just saved {fmtCurrency(celebration.cycle === 'yearly' ? celebration.amount : celebration.amount * 12)}/year
                 </p>
               </div>
@@ -1506,7 +1668,7 @@ export default function AppPage() {
             )}
             {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
             {pro && <span className="text-[12px] font-semibold text-[var(--green)]">PRO</span>}
-            <button onClick={() => { if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true); else setShowAdd(true); }} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
+            <button onClick={async () => { if (await openPaywallIfNeeded()) return; setShowAdd(true); }} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
               + Add
             </button>
           </div>
@@ -1720,35 +1882,21 @@ export default function AppPage() {
             </div>
             <div className="card p-0 overflow-hidden">
               {subs.sort((a, b) => daysUntil(a.nextDate) - daysUntil(b.nextDate)).map((sub, i) => (
-                <div key={sub.id} className="relative">
-                  {/* 左滑露出的取消底層 */}
-                  <div className="absolute inset-y-0 right-0 w-24 bg-[var(--red)] flex items-center justify-center text-[var(--bg)] text-[13px] font-semibold tracking-wide">
-                    Cancel
-                  </div>
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 25 }}
-                    exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
-                    className={i !== subs.length - 1 ? 'border-b border-[var(--divider)] bg-[var(--bg-elevated)]' : 'bg-[var(--bg-elevated)]'}
-                    drag="x"
-                    dragConstraints={{ left: -88, right: 0 }}
-                    dragElastic={0.12}
-                    whileDrag={{ scale: 0.97, opacity: 0.92 }}
-                    onDragEnd={(e, info) => {
-                      if (info.offset.x < -80) {
-                        try { navigator.vibrate?.(15); } catch { /* noop */ }
-                        openProofFlow(sub);
-                      }
-                    }}
-                  >
-                    <SubscriptionRow
-                      sub={sub}
-                      onDelete={() => openProofFlow(sub)}
-                      onCalError={(m) => { setError(m); setTimeout(() => setError(""), 4000); }}
-                    />
-                  </motion.div>
-                </div>
+                <SwipeableRow
+                  key={sub.id}
+                  index={i}
+                  last={i === subs.length - 1}
+                  hint={swipeHint && i === 0}
+                  leaving={leaving === sub.id}
+                  onHintShown={() => setSwipeHint(false)}
+                  onCancel={() => { buzz(15); openProofFlow(sub); }}
+                >
+                  <SubscriptionRow
+                    sub={sub}
+                    onDelete={() => openProofFlow(sub)}
+                    onCalError={(m) => { setError(m); setTimeout(() => setError(""), 4000); }}
+                  />
+                </SwipeableRow>
               ))}
             </div>
             {/* Subtle Gmail prompt — only when user has subs but no Gmail */}
@@ -1814,7 +1962,7 @@ export default function AppPage() {
         {/* 取消證據流程（Cancel proof）— 全屏 */}
         <AnimatePresence>
           {proof && (
-            <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-fade-in">
+            <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col animate-fade-in">
               <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
                 <button onClick={closeProofFlow} className="text-[var(--text-secondary)] text-[26px] leading-none px-2 hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
                 <h2 className="text-[15px] font-semibold text-[var(--text)]">Cancel proof</h2>
@@ -2050,7 +2198,7 @@ export default function AppPage() {
             >
               <div className="flex items-center justify-between px-6 pt-6 pb-3">
                 <p className="text-[14px] font-semibold text-[var(--bg)]">Proof — {proofViewer.name}</p>
-                <button onClick={() => setProofViewer(null)} className="text-[var(--bg)]/70 text-[26px] leading-none px-2 hover:text-[var(--bg)] transition-colors">&times;</button>
+                <button onClick={() => setProofViewer(null)} className="text-[var(--text-secondary)] text-[26px] leading-none px-2 hover:text-[var(--text)] transition-colors">&times;</button>
               </div>
               <div className="flex-1 flex items-center justify-center px-4 pb-10 overflow-hidden">
                 <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
@@ -2125,7 +2273,7 @@ export default function AppPage() {
         <AnimatePresence>
           {showTrustModal && (
             <div className="fixed inset-0 z-50 flex items-end justify-center">
-              <motion.div className="sheet-backdrop" onClick={() => setShowTrustModal(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+              <motion.div className="sheet-backdrop" onClick={() => { setShowTrustModal(false); scanningRef.current = false; setScanning(false); setScanStatus(""); }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
               <motion.div
                 className="sheet-content"
                 initial={{ y: "100%" }}
@@ -2186,7 +2334,12 @@ export default function AppPage() {
                 >
                   I understand — continue
                 </button>
-                <button onClick={() => setShowTrustModal(false)} className="text-[13px] text-[var(--text-secondary)] w-full text-center mt-3 py-2">Cancel</button>
+                <button
+                  onClick={() => { setShowTrustModal(false); scanningRef.current = false; setScanning(false); setScanStatus(""); }}
+                  className="text-[13px] text-[var(--text-secondary)] w-full text-center mt-3 py-2"
+                >
+                  Cancel
+                </button>
               </motion.div>
             </div>
           )}
@@ -2198,7 +2351,7 @@ export default function AppPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
               <motion.div className="sheet-backdrop" onClick={() => setShowPaywall(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
               <motion.div
-                className="relative bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl"
+                className="relative bg-[var(--bg-elevated)] border border-[var(--border)] rounded-[32px] p-8 w-full max-w-sm shadow-2xl"
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
@@ -2216,7 +2369,14 @@ export default function AppPage() {
                   {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
                 </button>
                 {buyError && <p className="text-[13px] text-red-600 mb-3 text-center">{buyError}</p>}
-                <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[var(--text-secondary)] w-full text-center">Maybe later</button>
+                <button
+                  onClick={handleRestore}
+                  disabled={restoring}
+                  className="text-[13px] text-[var(--text-tertiary)] hover:text-[var(--text)] w-full text-center mt-1 disabled:opacity-50"
+                >
+                  {restoring ? "Restoring…" : "Restore purchases"}
+                </button>
+                <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[var(--text-secondary)] w-full text-center mt-2">Maybe later</button>
               </motion.div>
             </div>
           )}
