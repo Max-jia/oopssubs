@@ -38,7 +38,7 @@ export default function InstallPrompt() {
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="fixed bottom-4 left-4 right-4 z-50"
         >
-          <div className="bg-[#1d1d1f] text-white rounded-3xl px-5 py-4 shadow-2xl flex items-center gap-4">
+          <div className="bg-[var(--text)] text-white rounded-3xl px-5 py-4 shadow-2xl flex items-center gap-4">
             <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
               <img src="/icon-192.png" alt="" className="w-7 h-7 rounded-lg" />
             </div>

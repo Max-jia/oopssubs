@@ -52,7 +52,7 @@ export default function HomePage() {
           transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
         >
           <motion.img
-            src="/icon-512.png"
+            src="/logo-gold.png"
             alt="OopsSubs logo"
             className="w-20 h-20 mx-auto"
             animate={{ scale: [1, 1.04, 1], y: [0, -4, 0] }}
@@ -61,22 +61,22 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
-        <h1 className="text-[14px] font-semibold text-[#86868b] tracking-[0.02em] mb-4">
+        <h1 className="text-[14px] font-semibold text-[var(--text-secondary)] tracking-[0.02em] mb-4">
           OopsSubs
         </h1>
         <motion.h1
-          className="text-[32px] font-extrabold tracking-[-0.02em] text-[#1d1d1f] mb-3 leading-[1.15]"
+          className="text-[32px] font-extrabold tracking-[-0.02em] text-[var(--text)] mb-3 leading-[1.15]"
           initial={{ y: 16 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-          Stop bleeding<br />on subscriptions
+          Stop bleeding<br /><span className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">on subscriptions</span>
         </motion.h1>
-        <p className="text-[17px] text-[#86868b] leading-relaxed mb-4 max-w-xs mx-auto">
+        <p className="text-[17px] text-[var(--text-secondary)] leading-relaxed mb-4 max-w-xs mx-auto">
           Find and cancel forgotten subscriptions<br />from your email inbox.
         </p>
         <motion.p
-          className="text-[13px] text-[#aeaeb2] mb-10 max-w-xs mx-auto"
+          className="text-[13px] text-[var(--text-tertiary)] mb-10 max-w-xs mx-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.5 }}
@@ -126,7 +126,7 @@ export default function HomePage() {
         </div>
         <motion.a
           href={appHref("list", isNative)}
-          className="block text-center text-[13px] text-[#86868b] mt-5 hover:text-[#1d1d1f] transition-colors"
+          className="block text-center text-[13px] text-[var(--text-secondary)] mt-5 hover:text-[var(--text)] transition-colors"
           whileTap={{ scale: 0.95 }}
         >
           View my subscriptions →
@@ -136,25 +136,25 @@ export default function HomePage() {
       {/* Cancel guides section */}
       <div className="max-w-md mx-auto px-6 pb-14">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Cancel guides</h2>
+          <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em]">Cancel guides</h2>
         </div>
         <div className="card overflow-hidden p-0">
           {guides.map((g, i) => (
             <Link
               key={g.slug}
               href={`/cancel/${g.slug}`}
-              className={`flex items-center justify-between px-5 py-3.5 hover:bg-[#f5f5f7] transition-colors duration-150 ${
-                i !== guides.length - 1 ? 'border-b border-[#e5e5ea]' : ''
+              className={`flex items-center justify-between px-5 py-3.5 hover:bg-[var(--bg-elevated)] transition-colors duration-150 ${
+                i !== guides.length - 1 ? 'border-b border-[var(--divider)]' : ''
               }`}
             >
-              <span className="text-[15px] font-medium text-[#1d1d1f]">{g.name}</span>
+              <span className="text-[15px] font-medium text-[var(--text)]">{g.name}</span>
               <span className={g.difficulty === 'easy' ? 'badge-easy' : g.difficulty === 'medium' ? 'badge-medium' : 'badge-hard'}>
                 {g.difficulty === 'easy' ? 'Easy' : g.difficulty === 'medium' ? 'Medium' : 'Hard'}
               </span>
             </Link>
           ))}
         </div>
-        <Link href="/cancel" className="block text-center text-[13px] text-[#86868b] mt-5 hover:text-[#1d1d1f] transition-colors">
+        <Link href="/cancel" className="block text-center text-[13px] text-[var(--text-secondary)] mt-5 hover:text-[var(--text)] transition-colors">
           View all {cancelGuides.length} services →
         </Link>
       </div>
@@ -162,13 +162,13 @@ export default function HomePage() {
       {/* Privacy trust block */}
       <div className="max-w-md mx-auto px-6 pb-14">
         <div className="card text-center">
-          <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#e8f5e9] mb-3">
-            <svg className="w-5 h-5 text-[#2e7d32]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--green-dim)] mb-3">
+            <svg className="w-5 h-5 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
             </svg>
           </div>
-          <h3 className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Private by design</h3>
-          <p className="text-[13px] text-[#86868b] leading-relaxed">
+          <h3 className="text-[15px] font-semibold text-[var(--text)] mb-1">Private by design</h3>
+          <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
             Your subscriptions and Gmail token live only on your phone. Nothing is stored, tracked, or uploaded.
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <div className="max-w-md mx-auto px-6 pb-10 text-center">
-        <p className="text-[13px] text-[#86868b] mb-2">OopsSubs — Find &amp; cancel forgotten subscriptions</p>
+        <p className="text-[13px] text-[var(--text-secondary)] mb-2">OopsSubs — Find &amp; cancel forgotten subscriptions</p>
         <div className="space-x-4">
           <Link href="/pricing" className="nav-link">Pro</Link>
           <Link href="/privacy" className="nav-link">Privacy</Link>

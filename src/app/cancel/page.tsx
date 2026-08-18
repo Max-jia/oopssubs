@@ -9,14 +9,14 @@ export default function AllCancelGuides() {
         Back
       </Link>
       <h1 className="text-[28px] font-extrabold tracking-[-0.02em] mb-2">Cancel guides</h1>
-      <p className="text-[15px] text-[#86868b] mb-8">Step-by-step for {cancelGuides.length} services. No fluff.</p>
+      <p className="text-[15px] text-[var(--text-secondary)] mb-8">Step-by-step for {cancelGuides.length} services. No fluff.</p>
       <div className="card overflow-hidden p-0">
         {cancelGuides.map((g, i) => (
           <Link
             key={g.slug}
             href={`/cancel/${g.slug}`}
-            className={`flex items-center justify-between px-5 py-3.5 hover:bg-[#f5f5f7] transition-colors duration-150 ${
-              i !== cancelGuides.length - 1 ? 'border-b border-[#e5e5ea]' : ''
+            className={`flex items-center justify-between px-5 py-3.5 hover:bg-[var(--bg-elevated)] transition-colors duration-150 ${
+              i !== cancelGuides.length - 1 ? 'border-b border-[var(--divider)]' : ''
             }`}
           >
             <span className="text-[15px] font-medium">{g.name}</span>

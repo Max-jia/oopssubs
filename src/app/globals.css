@@ -4,11 +4,37 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ── Dark-first design tokens ── */
+:root {
+  --bg: #0A0A0C;
+  --bg-elevated: #1C1C1F;
+  --bg-hover: #26262A;
+  --bg-active: #323236;
+  --border: #2C2C30;
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --text: #F5F5F7;
+  --text-secondary: #98989F;
+  --text-tertiary: #6E6E76;
+  --green: #30D158;
+  --green-dim: rgba(48, 209, 88, 0.12);
+  --red: #FF453A;
+  --red-dim: rgba(255, 69, 58, 0.12);
+  --amber: #FF9F0A;
+  --amber-dim: rgba(255, 159, 10, 0.12);
+  --brand: #FFB340;
+  --brand-strong: #FF9F0A;
+  --brand-dim: rgba(255, 179, 64, 0.14);
+  --input-bg: #1C1C1F;
+  --divider: #2C2C30;
+  --skeleton-hi: #26262A;
+  --skeleton-lo: #1C1C1F;
+}
+
 @layer base {
   * { -webkit-tap-highlight-color: transparent; }
   html { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   body {
-    @apply bg-[#f5f5f7] text-[#1d1d1f] antialiased selection:bg-[#1d1d1f] selection:text-white overflow-x-hidden;
+    @apply bg-[var(--bg)] text-[var(--text)] antialiased selection:bg-[var(--text)] selection:text-[var(--bg)] overflow-x-hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -17,94 +43,95 @@
 @layer components {
   /* ── Primary button ── */
   .btn-primary {
-    @apply relative bg-[#1d1d1f] text-white px-6 py-3.5 rounded-full font-semibold
-           active:scale-[0.94] active:bg-[#000]
-           transition-[transform] duration-[300ms]
+    @apply relative bg-[var(--text)] text-[var(--bg)] px-6 py-3.5 rounded-full font-semibold
+           active:scale-[0.94] active:bg-[#FFFFFF]
+           transition-[transform,background-color] duration-[300ms]
            disabled:opacity-40 disabled:cursor-not-allowed
            inline-flex items-center justify-center gap-2 text-[15px] tracking-[-0.01em];
   }
 
   /* ── Secondary button ── */
   .btn-secondary {
-    @apply bg-[#e8e8ed] text-[#1d1d1f] px-6 py-3.5 rounded-full font-semibold
-           active:scale-[0.94] active:bg-[#d2d2d7]
-           transition-[transform] duration-[300ms]
+    @apply bg-[var(--bg-hover)] text-[var(--text)] px-6 py-3.5 rounded-full font-semibold
+           border border-[var(--border)]
+           active:scale-[0.94] active:bg-[var(--bg-active)]
+           transition-[transform,background-color] duration-[300ms]
            inline-flex items-center justify-center gap-2 text-[15px] tracking-[-0.01em];
   }
 
   /* ── Ghost button ── */
   .btn-ghost {
-    @apply text-[#86868b] hover:text-[#1d1d1f] px-4 py-2 rounded-full text-sm font-medium
-           hover:bg-[#e8e8ed] active:scale-[0.95] active:bg-[#d2d2d7]
+    @apply text-[var(--text-secondary)] hover:text-[var(--text)] px-4 py-2 rounded-full text-sm font-medium
+           hover:bg-[var(--bg-hover)] active:scale-[0.95] active:bg-[var(--bg-active)]
            transition-all duration-[400ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] inline-flex items-center gap-2;
   }
 
   /* ── Icon button (circular) ── */
   .btn-icon {
     @apply w-10 h-10 rounded-full flex items-center justify-center
-           bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-[0.85] active:bg-[#d2d2d7]
+           bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-[0.85] active:bg-[var(--bg-active)]
            transition-[transform,background-color] duration-[400ms] inline-flex items-center gap-2;
   }
 
   /* ── Floating action button ── */
   .fab {
-    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#1d1d1f] text-white z-40
+    @apply fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[var(--text)] text-[var(--bg)] z-40
            flex items-center justify-center
-           shadow-[0_8px_30px_rgba(0,0,0,0.25)]
-           hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)] hover:-translate-y-1
-           active:scale-[0.88] active:shadow-[0_4px_15px_rgba(0,0,0,0.2)]
+           shadow-[0_8px_30px_rgba(0,0,0,0.45)]
+           hover:shadow-[0_12px_40px_rgba(0,0,0,0.55)] hover:-translate-y-1
+           active:scale-[0.88] active:shadow-[0_4px_15px_rgba(0,0,0,0.35)]
            transition-[transform,box-shadow] duration-[400ms] ease-[cubic-bezier(0.34,1.56,0.64,1)];
   }
 
   /* ── Card ── */
   .card {
-    @apply bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-6
-           shadow-[0_2px_12px_rgba(0,0,0,0.04)]
+    @apply bg-[var(--bg-elevated)] border border-[var(--border)] rounded-3xl p-6
+           shadow-[0_2px_12px_rgba(0,0,0,0.3)]
            transition-transform duration-[400ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]
            active:scale-[0.985];
   }
 
   .card-elevated {
-    @apply card shadow-[0_8px_30px_rgba(0,0,0,0.08)];
+    @apply card shadow-[0_8px_30px_rgba(0,0,0,0.45)];
   }
 
   /* ── List row press ── */
   .row-tappable {
-    @apply active:bg-[#f5f5f7] transition-colors duration-150 active:scale-[0.985] transition-transform duration-[400ms] ease-[cubic-bezier(0.34,1.56,0.64,1)];
+    @apply active:bg-[var(--bg-hover)] transition-colors duration-150 active:scale-[0.985] transition-transform duration-[400ms] ease-[cubic-bezier(0.34,1.56,0.64,1)];
   }
 
   /* ── Input ── */
   .input-apple {
-    @apply w-full bg-[#f5f5f7] border-0 rounded-2xl px-4 py-3.5 text-[15px]
-           placeholder:text-[#aeaeb2]
-           focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/10 focus:bg-white focus:shadow-[0_2px_12px_rgba(0,0,0,0.06)]
+    @apply w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-2xl px-4 py-3.5 text-[15px]
+           placeholder:text-[var(--text-tertiary)]
+           focus:outline-none focus:ring-2 focus:ring-[var(--text)] focus:bg-[var(--bg-hover)] focus:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
            transition-all duration-300 ease-out;
   }
 
   .select-apple {
-    @apply bg-[#f5f5f7] border-0 rounded-2xl px-4 py-3.5 text-[15px] appearance-none
-           focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/10 focus:bg-white focus:shadow-[0_2px_12px_rgba(0,0,0,0.06)]
+    @apply bg-[var(--input-bg)] border border-[var(--border)] rounded-2xl px-4 py-3.5 text-[15px] appearance-none
+           focus:outline-none focus:ring-2 focus:ring-[var(--text)] focus:bg-[var(--bg-hover)] focus:shadow-[0_2px_12px_rgba(0,0,0,0.4)]
            transition-all duration-300 ease-out cursor-pointer;
   }
 
   /* ── Bottom sheet ── */
   .sheet-backdrop {
-    @apply absolute inset-0 bg-black/20 backdrop-blur-sm;
+    @apply absolute inset-0 bg-black/60 backdrop-blur-sm;
     animation: fadeIn 0.25s ease-out;
   }
 
   .sheet-content {
-    @apply relative bg-white rounded-t-[32px] p-6 w-full max-w-md shadow-2xl;
+    @apply relative bg-[var(--bg-elevated)] border-t border-[var(--border)] rounded-t-[32px] p-6 w-full max-w-md shadow-2xl;
     animation: sheetBounce 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* ── Badges ── */
-  .badge-easy { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[#e8f5e9] text-[#2e7d32]; }
-  .badge-medium { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[#fff3e0] text-[#e65100]; }
-  .badge-hard { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[#ffebee] text-[#c62828]; }
+  .badge-easy { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--green-dim)] text-[var(--green)]; }
+  .badge-medium { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--amber-dim)] text-[var(--amber)]; }
+  .badge-hard { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--red-dim)] text-[var(--red)]; }
 
-  .divider { @apply h-px bg-[#e5e5ea] my-4; }
-  .nav-link { @apply text-[13px] text-[#86868b] hover:text-[#1d1d1f] transition-colors duration-200; }
+  .divider { @apply h-px bg-[var(--divider)] my-4; }
+  .nav-link { @apply text-[13px] text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors duration-200; }
 }
 
 /* ── Keyframes ── */
@@ -189,7 +216,7 @@
 
 .scan-line {
   @apply absolute left-2 right-2 h-0.5 rounded-full;
-  background: linear-gradient(90deg, transparent, #1d1d1f, transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
   animation: scanLine 2s ease-in-out infinite;
 }
 
@@ -203,8 +230,8 @@
 
 /* ── Logo breathing + subtle float ── */
 @keyframes logoBreathe {
-  0%, 100% { transform: scale(1) translateY(0); filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08)); }
-  50% { transform: scale(1.03) translateY(-3px); filter: drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
+  0%, 100% { transform: scale(1) translateY(0); filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35)); }
+  50% { transform: scale(1.03) translateY(-3px); filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5)); }
 }
 
 @keyframes logoWink {
@@ -254,7 +281,7 @@
 
 /* ── Shimmer loading ── */
 .skeleton {
-  background: linear-gradient(90deg, #e5e5ea 25%, #f5f5f7 50%, #e5e5ea 75%);
+  background: linear-gradient(90deg, var(--skeleton-hi) 25%, var(--skeleton-lo) 50%, var(--skeleton-hi) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   @apply rounded-2xl;
@@ -267,7 +294,7 @@
 .tap-ripple::before {
   content: '';
   @apply absolute inset-0 rounded-[inherit] opacity-0;
-  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(255,255,255,0.4) 0%, transparent 60%);
+  background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(0,0,0,0.3) 0%, transparent 60%);
   transition: opacity 0.4s ease-out;
 }
 .tap-ripple:active::before {
@@ -298,4 +325,4 @@ html { scroll-behavior: smooth; }
 
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 99px; }
+::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 99px; }

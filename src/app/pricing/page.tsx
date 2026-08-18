@@ -32,15 +32,15 @@ export default function PricingPage() {
         transition={{ delay: 0.1 }}
       >
         <h1 className="text-[28px] font-extrabold tracking-[-0.02em] mb-2">OopsSubs Pro</h1>
-        <p className="text-[15px] text-[#86868b] mb-8">One payment. Unlimited subscriptions. Forever.</p>
+        <p className="text-[15px] text-[var(--text-secondary)] mb-8">One payment. Unlimited subscriptions. Forever.</p>
 
         {/* Price card */}
         <div className="card-elevated text-center mb-6">
-          <p className="text-[14px] text-[#86868b] line-through mb-1">$19.99</p>
-          <p className="text-[48px] font-extrabold tracking-[-0.03em] mb-1">
+          <p className="text-[14px] text-[var(--text-secondary)] line-through mb-1">$19.99</p>
+          <p className="text-[48px] font-extrabold tracking-[-0.03em] mb-1 text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">
             $9.99
           </p>
-          <p className="text-[14px] text-[#86868b] mb-6">one-time payment</p>
+          <p className="text-[14px] text-[var(--text-secondary)] mb-6">one-time payment</p>
 
           <ul className="text-left space-y-3 mb-6 text-[15px]">
             {[
@@ -55,26 +55,26 @@ export default function PricingPage() {
               "Free updates forever",
             ].map((f, i) => (
               <li key={i} className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-[#2e7d32] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                <span className="text-[#1d1d1f]">{f}</span>
+                <svg className="w-5 h-5 text-[var(--green)] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                <span className="text-[var(--text)]">{f}</span>
               </li>
             ))}
           </ul>
 
           <button
-            onClick={handleBuy}
+            onClick={() => { try { navigator.vibrate?.(30); } catch { /* noop */ } handleBuy(); }}
             disabled={buying}
             className="btn-primary w-full text-[17px] font-semibold py-4 disabled:opacity-50"
           >
             {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
           </button>
-          <p className="text-[12px] text-[#aeaeb2] mt-3">Pay once. No subscription. No recurring fees.</p>
-          {purchased && <p className="text-[13px] text-[#2e7d32] mt-2">✓ Pro unlocked — enjoy unlimited subscriptions!</p>}
+          <p className="text-[12px] text-[var(--text-tertiary)] mt-3">Pay once. No subscription. No recurring fees.</p>
+          {purchased && <p className="text-[13px] text-[var(--green)] mt-2">✓ Pro unlocked — enjoy unlimited subscriptions!</p>}
           {buyError && <p className="text-[13px] text-red-600 mt-2">{buyError}</p>}
         </div>
 
         {/* Trust */}
-        <div className="card text-center text-[13px] text-[#86868b] space-y-2">
+        <div className="card text-center text-[13px] text-[var(--text-secondary)] space-y-2">
           <p className="flex items-center justify-center gap-1.5">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />

@@ -62,7 +62,7 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
       </h1>
 
       {guide.warning && (
-        <div className="bg-[#ffebee] rounded-2xl p-4 mb-6 text-[14px] text-[#c62828] leading-relaxed">
+        <div className="bg-[var(--red-dim)] rounded-2xl p-4 mb-6 text-[14px] text-[var(--red)] leading-relaxed">
           {guide.warning}
         </div>
       )}
@@ -70,11 +70,11 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
       <div className="card mb-6">
         <ol className="space-y-0">
           {guide.steps.map((step, i) => (
-            <li key={i} className={`flex gap-4 ${i !== 0 ? 'pt-4' : ''} ${i !== guide.steps.length - 1 ? 'pb-4 border-b border-[#e5e5ea]' : ''}`}>
-              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[#1d1d1f] text-white text-[13px] flex items-center justify-center font-semibold mt-0.5">
+            <li key={i} className={`flex gap-4 ${i !== 0 ? 'pt-4' : ''} ${i !== guide.steps.length - 1 ? 'pb-4 border-b border-[var(--divider)]' : ''}`}>
+              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--text)] text-white text-[13px] flex items-center justify-center font-semibold mt-0.5">
                 {i + 1}
               </span>
-              <span className="text-[15px] text-[#1d1d1f] leading-relaxed pt-0.5">{step}</span>
+              <span className="text-[15px] text-[var(--text)] leading-relaxed pt-0.5">{step}</span>
             </li>
           ))}
         </ol>
@@ -100,7 +100,7 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
 
       {/* Data citation */}
       {guide.citation && (
-        <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-4 text-[13px] text-[#86868b] leading-relaxed">
+        <div className="bg-[var(--bg-elevated)] rounded-2xl p-4 mb-4 text-[13px] text-[var(--text-secondary)] leading-relaxed">
           {guide.citation}
         </div>
       )}
@@ -110,16 +110,16 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
         <h3 className="text-[15px] font-semibold mb-3">FAQ</h3>
         <div className="space-y-3 text-[14px]">
           <div>
-            <p className="font-medium text-[#1d1d1f]">Will I lose my data if I cancel?</p>
-            <p className="text-[#86868b]">Most services keep your data for a period after cancellation. {guide.name} is no exception — you typically retain access until the end of your billing cycle.</p>
+            <p className="font-medium text-[var(--text)]">Will I lose my data if I cancel?</p>
+            <p className="text-[var(--text-secondary)]">Most services keep your data for a period after cancellation. {guide.name} is no exception — you typically retain access until the end of your billing cycle.</p>
           </div>
           <div>
-            <p className="font-medium text-[#1d1d1f]">Can I get a refund?</p>
-            <p className="text-[#86868b]">Most subscription services do not offer prorated refunds. Cancel right before your renewal date to maximize value.</p>
+            <p className="font-medium text-[var(--text)]">Can I get a refund?</p>
+            <p className="text-[var(--text-secondary)]">Most subscription services do not offer prorated refunds. Cancel right before your renewal date to maximize value.</p>
           </div>
           <div>
-            <p className="font-medium text-[#1d1d1f]">What if the cancel button is missing?</p>
-            <p className="text-[#86868b]">
+            <p className="font-medium text-[var(--text)]">What if the cancel button is missing?</p>
+            <p className="text-[var(--text-secondary)]">
               {guide.difficulty === 'hard'
                 ? `${guide.name} is known for making cancellation difficult. If you can\'t find the option, try a different device or browser, or use the phone number listed above.`
                 : 'Try a different device or browser. Some services hide cancel options on mobile. Switch to desktop view.'}
@@ -129,13 +129,13 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
       </div>
 
       {/* Freshness signal */}
-      <p className="text-center text-[12px] text-[#aeaeb2] mb-4">
+      <p className="text-center text-[12px] text-[var(--text-tertiary)] mb-4">
         Last updated: July 24, 2026 · Cancel guides verified by OopsSubs
       </p>
 
       <div className="card text-center py-8 mt-6">
         <h3 className="text-[17px] font-semibold mb-1">One at a time?</h3>
-        <p className="text-[14px] text-[#86868b] mb-5">Scan all your subscriptions at once.</p>
+        <p className="text-[14px] text-[var(--text-secondary)] mb-5">Scan all your subscriptions at once.</p>
         <Link href="/app" className="btn-primary text-[15px]">
           Connect Gmail to find everything
         </Link>

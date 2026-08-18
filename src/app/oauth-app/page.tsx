@@ -19,7 +19,7 @@ export default function OAuthAppRedirect() {
   }, []);
 
   return (
-    <main className="min-h-screen flex items-center justify-center text-[14px] text-[#86868b]">
+    <main className="min-h-screen flex items-center justify-center text-[14px] text-[var(--text-secondary)]">
       Redirecting back to OopsSubs…
     </main>
   );

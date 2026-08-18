@@ -8,9 +8,9 @@ export default function TermsPage() {
         Home
       </Link>
       <h1 className="text-[28px] font-extrabold tracking-[-0.02em] mb-2">Terms of Service</h1>
-      <p className="text-[15px] text-[#86868b] mb-8">Last updated: July 24, 2026</p>
+      <p className="text-[15px] text-[var(--text-secondary)] mb-8">Last updated: July 24, 2026</p>
 
-      <div className="space-y-6 text-[14px] text-[#1d1d1f] leading-relaxed">
+      <div className="space-y-6 text-[14px] text-[var(--text)] leading-relaxed">
         <section>
           <h2 className="text-[17px] font-semibold mb-2">1. What OopsSubs does</h2>
           <p>OopsSubs helps you find and manage paid subscriptions by scanning your Gmail inbox for subscription-related emails. You can also manually add subscriptions and receive renewal reminders.</p>

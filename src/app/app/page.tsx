@@ -187,43 +187,43 @@ function DebtCard({ p, onOpen }: { p: PendingProof; onOpen: () => void }) {
     return () => clearInterval(t);
   }, [level]);
 
-  // 動效參數：等級越高搖越大、閃越快；第 1 天只有呼吸
-  const shakeX = level >= 3 ? [0, -8, 8, -5, 5, 0] : level >= 2 ? [0, -6, 6, -4, 4, 0] : level === 1 ? [0, -3, 3, 0] : [0];
-  const shakeDur = level >= 3 ? 1.1 : level >= 2 ? 1.6 : 2.4;
-  const breathe = level === 0 ? [1, 1.015, 1] : level >= 3 ? [1, 1.03, 1] : [1, 1.02, 1];
-  const breatheDur = level === 0 ? 2.8 : level >= 3 ? 1.4 : 2;
-  const flashPeak = level >= 3 ? 0.18 : level >= 2 ? 0.12 : 0;
-  const flashDur = level >= 3 ? 0.8 : 1.2;
+  // 動效參數：等級越高搖越大、閃越快；第 1 天只有呼吸（v18 起搖晃強度減半、紅光只閃兩下）
+  const shakeX = level >= 3 ? [0, -4, 4, -2.5, 2.5, 0] : level >= 2 ? [0, -3, 3, -2, 2, 0] : level === 1 ? [0, -2, 2, 0] : [0];
+  const shakeDur = level >= 3 ? 1.6 : level >= 2 ? 2.2 : 3;
+  const breathe = level === 0 ? [1, 1.015, 1] : level >= 3 ? [1, 1.025, 1] : [1, 1.02, 1];
+  const breatheDur = level === 0 ? 2.8 : level >= 3 ? 1.8 : 2;
+  const flashPeak = level >= 3 ? 0.12 : level >= 2 ? 0.08 : 0;
+  const flashDur = level >= 3 ? 0.9 : 1.3;
 
   return (
     <motion.div
-      className="card bg-[#1d1d1f] overflow-hidden mb-6"
+      className="card bg-[var(--text)] overflow-hidden mb-6"
       animate={{ x: shakeX, scale: breathe }}
       transition={{ duration: shakeDur, repeat: Infinity, ease: "easeInOut" }}
     >
       <div className="relative px-5 py-4">
-        {/* 紅閃層：天數越高紅光越強 */}
+        {/* 紅閃層：天數越高紅光越強（v18 起只閃兩下就停，避免刺眼） */}
         {flashPeak > 0 && (
           <motion.div
-            className="absolute inset-0 bg-[#e65100]"
+            className="absolute inset-0 bg-[var(--amber)]"
             animate={{ opacity: [0, flashPeak, 0] }}
-            transition={{ duration: flashDur, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: flashDur, repeat: 1, ease: "easeInOut" }}
           />
         )}
         <div className="relative">
-          <p className="text-[10px] font-bold tracking-[0.16em] text-[#e65100] mb-2">OPEN CASE · EVIDENCE DUE</p>
+          <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--amber)] mb-2">OPEN CASE · EVIDENCE DUE</p>
           <motion.p
-            className="text-[40px] font-black leading-none text-[#e65100]"
+            className="text-[40px] font-black leading-none text-[var(--amber)]"
             animate={level >= 2 ? { scale: [1, 1.12, 1] } : {}}
             transition={{ duration: level >= 3 ? 0.7 : 1.1, repeat: Infinity, ease: "easeInOut" }}
           >
             DAY {days}
           </motion.p>
-          <p className="text-[16px] font-semibold text-white mt-1">{p.name}</p>
-          <p className="text-[13px] text-white/45 min-h-[18px] mt-0.5 mb-4">{line}</p>
+          <p className="text-[16px] font-semibold text-[var(--bg)] mt-1">{p.name}</p>
+          <p className="text-[13px] text-[var(--bg)]/45 min-h-[18px] mt-0.5 mb-4">{line}</p>
           <button
             onClick={onOpen}
-            className="w-full bg-[#e65100] text-white text-[15px] font-semibold py-3 rounded-xl active:scale-[0.98] transition-transform"
+            className="w-full bg-[var(--amber)] text-[var(--bg)] text-[15px] font-semibold py-3 rounded-xl active:scale-[0.98] transition-transform"
           >
             Turn in the evidence
           </button>
@@ -280,6 +280,9 @@ function monthlyEquivalent(sub: Subscription): number {
 function totalMonthly(subs: Subscription[]): number {
   return subs.reduce((sum, s) => sum + monthlyEquivalent(s), 0);
 }
+// 點擊微互動：Android WebView 支援 vibrate,網站自動忽略
+function buzz(ms = 30) { try { navigator.vibrate?.(ms); } catch { /* noop */ } }
+
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 }
@@ -820,25 +823,25 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
   };
   const days = daysUntil(sub.nextDate);
   const urgency = sub.isTrial
-    ? (days <= 3 ? "text-[#c62828] bg-[#ffebee]" : "text-[#e65100] bg-[#fff3e0]")
-    : days <= 3 ? "text-[#c62828] bg-[#ffebee]" : days <= 7 ? "text-[#e65100] bg-[#fff3e0]" : "text-[#86868b] bg-[#f5f5f7]";
+    ? (days <= 3 ? "text-[var(--red)] bg-[var(--red-dim)]" : "text-[var(--amber)] bg-[var(--amber-dim)]")
+    : days <= 3 ? "text-[var(--red)] bg-[var(--red-dim)]" : days <= 7 ? "text-[var(--amber)] bg-[var(--amber-dim)]" : "text-[var(--text-secondary)] bg-[var(--bg-elevated)]";
   return (
-    <div className="flex items-center justify-between py-3.5 px-5 hover:bg-[#f5f5f7]/50 transition-colors duration-150 group -mx-5 rounded-2xl">
+    <div className="flex items-center justify-between py-3.5 px-5 hover:bg-[var(--bg-elevated)]/50 transition-colors duration-150 group -mx-5 rounded-2xl">
       <div className="flex items-center gap-3.5 min-w-0">
-        <div className="w-11 h-11 rounded-2xl bg-[#f5f5f7] flex items-center justify-center text-[15px] font-semibold text-[#1d1d1f] flex-shrink-0 shadow-sm">
+        <div className="w-11 h-11 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center text-[15px] font-semibold text-[var(--text)] flex-shrink-0 shadow-sm">
           {sub.name[0].toUpperCase()}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <div className="text-[15px] font-medium truncate">{sub.name}</div>
             {sub.isTrial && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fff3e0] text-[#e65100] flex-shrink-0">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--amber-dim)] text-[var(--amber)] flex-shrink-0">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 Free trial
               </span>
             )}
           </div>
-          <div className="text-[13px] text-[#86868b]">{fmtCurrency(sub.amount)}/{sub.cycle === 'monthly' ? 'mo' : sub.cycle === 'yearly' ? 'yr' : 'qtr'}</div>
+          <div className="text-[13px] text-[var(--text-secondary)]">{fmtCurrency(sub.amount)}/{sub.cycle === 'monthly' ? 'mo' : sub.cycle === 'yearly' ? 'yr' : 'qtr'}</div>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -848,18 +851,18 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
         <button
           onClick={handleAddToCalendar}
           disabled={calBusy}
-          className="text-[#aeaeb2] hover:text-[#1d1d1f] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[#e8e8ed] flex items-center justify-center disabled:opacity-50"
+          className="text-[var(--text-tertiary)] hover:text-[var(--text)] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center disabled:opacity-50"
           title="Add to calendar"
         >
           {calBusy ? (
             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
           ) : addedToCal ? (
-            <svg className="w-4 h-4 text-[#2e7d32]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            <svg className="w-4 h-4 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
           ) : (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" /></svg>
           )}
         </button>
-        <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-[#aeaeb2] hover:text-[#c62828] transition-all duration-200 text-lg leading-none w-6 h-6 rounded-full hover:bg-[#ffebee] flex items-center justify-center">&times;</button>
+        <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 text-[var(--text-tertiary)] hover:text-[var(--red)] transition-all duration-200 text-lg leading-none w-6 h-6 rounded-full hover:bg-[var(--red-dim)] flex items-center justify-center">&times;</button>
       </div>
     </div>
   );
@@ -1389,11 +1392,11 @@ export default function AppPage() {
           key={s.id}
           initial={{ y: -60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-[#1d1d1f] text-white px-6 py-5 animate-slide-down"
+          className="bg-[var(--text)] text-[var(--bg)] px-6 py-5 animate-slide-down"
         >
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] text-white/60 mb-0.5">Renews tomorrow</p>
+              <p className="text-[13px] text-[var(--bg)]/60 mb-0.5">Renews tomorrow</p>
               <p className="text-[17px] font-semibold truncate">{s.name} · {fmtCurrency(s.amount)}</p>
             </div>
             <button
@@ -1402,11 +1405,11 @@ export default function AppPage() {
                 const cancelSlug = cancelSlugFor(s.name);
                 window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
               }}
-              className="flex-shrink-0 bg-white text-[#1d1d1f] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
+              className="flex-shrink-0 bg-white text-[var(--text)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
               Cancel now
             </button>
-            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-white/40 hover:text-white text-lg">&times;</button>
+            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--bg)]/40 hover:text-[var(--bg)] text-lg">&times;</button>
           </div>
         </motion.div>
       ))}
@@ -1416,10 +1419,10 @@ export default function AppPage() {
         <motion.div
           initial={{ y: -60, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-[#fff3e0] px-6 py-5"
+          className="bg-[var(--amber-dim)] px-6 py-5"
         >
           <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-            <p className="text-[14px] font-medium text-[#e65100]">
+            <p className="text-[14px] font-medium text-[var(--amber)]">
               Did you cancel {followUpCancel.name}?
             </p>
             <div className="flex gap-2 flex-shrink-0">
@@ -1430,7 +1433,7 @@ export default function AppPage() {
                   if (sub) { setFollowUpCancel(null); openProofFlow(sub); }
                   else { deleteSub(followUpCancel.subId); clearPendingCancel(followUpCancel.subId); setFollowUpCancel(null); }
                 }}
-                className="bg-[#e65100] text-white text-[13px] font-semibold px-3 py-1.5 rounded-full active:scale-95"
+                className="bg-[var(--amber)] text-[var(--bg)] text-[13px] font-semibold px-3 py-1.5 rounded-full active:scale-95"
               >
                 Yes, done
               </button>
@@ -1439,7 +1442,7 @@ export default function AppPage() {
                   clearPendingCancel(followUpCancel.subId);
                   setFollowUpCancel(null);
                 }}
-                className="text-[#e65100] text-[13px] px-3 py-1.5 rounded-full active:scale-95"
+                className="text-[var(--amber)] text-[13px] px-3 py-1.5 rounded-full active:scale-95"
               >
                 Not yet
               </button>
@@ -1452,15 +1455,15 @@ export default function AppPage() {
         {/* Lifetime savings */}
         {lifetimeSavings() > 0 && (
           <div className="text-center mb-8">
-            <p className="text-[12px] text-[#86868b] uppercase tracking-[0.05em]">Lifetime saved</p>
-            <p className="text-[28px] font-extrabold tracking-[-0.02em] text-[#2e7d32]">{fmtCurrency(lifetimeSavings())}</p>
+            <p className="text-[12px] text-[var(--text-secondary)] uppercase tracking-[0.05em]">Lifetime saved</p>
+            <p className="text-[28px] font-extrabold tracking-[-0.02em] text-[var(--green)]">{fmtCurrency(lifetimeSavings())}</p>
             <button
               onClick={() => {
                 const cancelled = getCancelled().slice(-5).map(c => `${c.name} ${fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr`).join(', ');
                 const text = `I found ${fmtCurrency(lifetimeSavings())}/year in forgotten subscriptions using OopsSubs.\nMy cancelled: ${cancelled}\nCheck yours → oopssubs.com`;
                 navigator.clipboard.writeText(text).then(() => alert('Copied! Share anywhere.'));
               }}
-              className="text-[12px] text-[#86868b] underline hover:text-[#1d1d1f] mt-1"
+              className="text-[12px] text-[var(--text-secondary)] underline hover:text-[var(--text)] mt-1"
             >
               Share your savings
             </button>
@@ -1474,16 +1477,16 @@ export default function AppPage() {
               initial={{ y: -50, opacity: 0, scale: 0.9 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: -50, opacity: 0 }}
-              className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[#1d1d1f] text-white rounded-3xl px-6 py-5 shadow-2xl flex items-center gap-4"
+              className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[var(--text)] text-[var(--bg)] rounded-3xl px-6 py-5 shadow-2xl flex items-center gap-4"
             >
               <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-5 h-5 text-[var(--bg)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </span>
               <div className="flex-1">
                 <p className="text-[14px] font-semibold">Cancelled {celebration.name}!</p>
-                <p className="text-[13px] text-white/60">
+                <p className="text-[13px] text-[var(--bg)]/60">
                   You just saved {fmtCurrency(celebration.cycle === 'yearly' ? celebration.amount : celebration.amount * 12)}/year
                 </p>
               </div>
@@ -1499,11 +1502,11 @@ export default function AppPage() {
           </Link>
           <div className="flex items-center gap-2">
             {!pro && (
-              <span className="text-[12px] text-[#86868b]">{subs.length}/{FREE_LIMIT} free</span>
+              <span className="text-[12px] text-[var(--text-secondary)]">{subs.length}/{FREE_LIMIT} free</span>
             )}
-            {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[#1d1d1f] bg-[#f5f5f7] hover:bg-[#e8e8ed] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
-            {pro && <span className="text-[12px] font-semibold text-[#2e7d32]">PRO</span>}
-            <button onClick={() => { if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true); else setShowAdd(true); }} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
+            {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
+            {pro && <span className="text-[12px] font-semibold text-[var(--green)]">PRO</span>}
+            <button onClick={() => { if (!pro && subs.length >= FREE_LIMIT) setShowPaywall(true); else setShowAdd(true); }} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
               + Add
             </button>
           </div>
@@ -1511,9 +1514,9 @@ export default function AppPage() {
 
         {/* Total */}
         <div className="text-center mb-10">
-          <p className="text-[13px] font-medium text-[#86868b] uppercase tracking-[0.05em] mb-2">Monthly spend</p>
+          <p className="text-[13px] font-medium text-[var(--text-secondary)] uppercase tracking-[0.05em] mb-2">Monthly spend</p>
           <motion.p
-            className="text-[48px] font-extrabold tracking-[-0.03em]"
+            className="text-[48px] font-extrabold tracking-[-0.03em] text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]"
             key={monthTotal.toFixed(2)}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1522,13 +1525,13 @@ export default function AppPage() {
             {fmtCurrency(monthTotal)}
           </motion.p>
           {subs.length > 0 && (
-            <p className="text-[14px] text-[#86868b] mt-1 animate-slide-down">{subs.length} subscription{subs.length > 1 ? 's' : ''}</p>
+            <p className="text-[14px] text-[var(--text-secondary)] mt-1 animate-slide-down">{subs.length} subscription{subs.length > 1 ? 's' : ''}</p>
           )}
         </div>
 
         {/* Gmail scan — empty state */}
         {subs.length === 0 && scannedItems.length === 0 && !scanning && (
-          <button onClick={handleGmailScan} disabled={!googleReady} className="btn-primary w-full text-[17px] font-semibold py-4 mb-4">
+          <button onClick={() => { buzz(30); handleGmailScan(); }} disabled={!googleReady} className="btn-primary w-full text-[17px] font-semibold py-4 mb-4">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
             </svg>
@@ -1542,11 +1545,11 @@ export default function AppPage() {
             {/* Animated envelope icon */}
             <div className="relative w-20 h-20 mx-auto mb-6">
               {/* Outer ring pulsing */}
-              <div className="absolute inset-0 rounded-full border-2 border-[#e5e5ea] animate-pulse" />
+              <div className="absolute inset-0 rounded-full border-2 border-[var(--divider)] animate-pulse" />
               {/* Envelope */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 text-[#1d1d1f] envelope-float" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+                  <svg className="w-10 h-10 text-[var(--text)] envelope-float" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                   </svg>
                   {/* Scanning line */}
@@ -1557,21 +1560,21 @@ export default function AppPage() {
             <p className="text-[17px] font-semibold mb-2">{scanStatus || "Scanning your inbox"}</p>
             {/* Animated dots */}
             <div className="flex items-center justify-center gap-1.5 mb-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
-              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
-              <div className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f] dot-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text)] dot-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text)] dot-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[var(--text)] dot-pulse" />
             </div>
-            <p className="text-[14px] text-[#86868b]">We never store your emails. This stays on your device.</p>
+            <p className="text-[14px] text-[var(--text-secondary)]">We never store your emails. This stays on your device.</p>
           </div>
         )}
 
         {/* Error */}
         {error && !scanning && (
-          <div className="card bg-[#ffebee] border-[#ffcdd2] mb-6 text-[14px] text-[#c62828]">
+          <div className="card bg-[var(--red-dim)] border-[var(--red)] mb-6 text-[14px] text-[var(--red)]">
             <p className="mb-2">{error}</p>
             <div className="flex gap-2">
               {/re-authorize|Session expired/i.test(error) && (
-                <button onClick={handleGmailScan} className="bg-[#c62828] text-white text-[13px] font-medium px-4 py-2 rounded-full active:scale-95 transition-transform">Reconnect Gmail</button>
+                <button onClick={handleGmailScan} className="bg-[var(--red)] text-[var(--bg)] text-[13px] font-medium px-4 py-2 rounded-full active:scale-95 transition-transform">Reconnect Gmail</button>
               )}
               <button onClick={() => setError("")} className="text-[13px] font-medium underline">Dismiss</button>
             </div>
@@ -1581,7 +1584,7 @@ export default function AppPage() {
         {/* Scanned items */}
         {scannedItems.length > 0 && (
           <div className="mb-8 animate-slide-down">
-            <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em] mb-3">Found in your inbox</h2>
+            <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em] mb-3">Found in your inbox</h2>
             <div className="space-y-2 stagger-item">
               {scannedItems.map((item, i) => (
                 <motion.div
@@ -1589,19 +1592,19 @@ export default function AppPage() {
                   initial={{ opacity: 0, y: 16, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ delay: i * 0.08, type: "spring", stiffness: 400, damping: 22 }}
-                  className={`card flex items-center justify-between gap-3 py-4 px-5 ${item.isTrial ? 'border-[#fff3e0] bg-[#fff8f0]' : ''}`}
+                  className={`card flex items-center justify-between gap-3 py-4 px-5 ${item.isTrial ? 'border-[var(--amber)] bg-[var(--amber-dim)]' : ''}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <div className="text-[15px] font-semibold">{item.name}</div>
                       {item.isTrial && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fff3e0] text-[#e65100]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--amber-dim)] text-[var(--amber)]">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           Free trial
                         </span>
                       )}
                     </div>
-                    <div className="text-[13px] text-[#86868b]">
+                    <div className="text-[13px] text-[var(--text-secondary)]">
                       {item.isTrial ? (
                         <>
                           {item.amount > 0 ? `${fmtCurrency(item.amount)}/${item.cycle} after trial` : 'Amount unknown'}
@@ -1611,19 +1614,19 @@ export default function AppPage() {
                         <>{item.amount > 0 ? fmtCurrency(item.amount) + '/' + item.cycle : 'Amount unknown'}</>
                       )}
                       {item.confidence === 'low' && !item.isTrial && (
-                        <span className="inline-flex items-center gap-1 ml-2 text-[#e65100]">
+                        <span className="inline-flex items-center gap-1 ml-2 text-[var(--amber)]">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                           Low confidence
                         </span>
                       )}
                     </div>
                     {item.source && (
-                      <div className="text-[11px] text-[#aeaeb2] mt-0.5 truncate max-w-[200px]">{item.source}</div>
+                      <div className="text-[11px] text-[var(--text-tertiary)] mt-0.5 truncate max-w-[200px]">{item.source}</div>
                     )}
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
-                    <button onClick={() => dismissScanned(i)} className="bg-[#f5f5f7] hover:bg-[#e8e8ed] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
-                    <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-white text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[#e65100] hover:bg-[#bf360c]' : 'bg-[#1d1d1f] hover:bg-[#3a3a3c]'}`}>Add</button>
+                    <button onClick={() => dismissScanned(i)} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
+                    <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-[var(--bg)] text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[var(--amber)] hover:bg-[#e68f00]' : 'bg-[var(--text)] hover:bg-[var(--bg-hover)]'}`}>Add</button>
                   </div>
                 </motion.div>
               ))}
@@ -1641,16 +1644,16 @@ export default function AppPage() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="card bg-[#fff3e0] border border-[#ffe0b2] mb-6"
+                  className="card bg-[var(--amber-dim)] border border-[var(--amber)] mb-6"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[15px] font-semibold text-[#1d1d1f] mb-1">
+                      <p className="text-[15px] font-semibold text-[var(--text)] mb-1">
                         {daysUntil(trialAlert.nextDate) === 0
                           ? `Today: ${trialAlert.name} free trial ends`
                           : `${trialAlert.name} trial ended — you may have been charged`}
                       </p>
-                      <p className="text-[13px] text-[#86868b] leading-relaxed">
+                      <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                         {daysUntil(trialAlert.nextDate) === 0
                           ? `It will auto-charge ${fmtCurrency(trialAlert.amount)} today.`
                           : `You may have been charged ${fmtCurrency(trialAlert.amount)}. Keep it or cancel?`}
@@ -1658,20 +1661,20 @@ export default function AppPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={keepTrial}
-                        className="bg-[#fff3e0] hover:bg-[#ffe0b2] active:scale-95 transition-all duration-150 text-[#e65100] text-[13px] font-medium px-3.5 py-2 rounded-full"
+                        onClick={() => { buzz(15); keepTrial(); }}
+                        className="bg-[var(--amber-dim)] hover:bg-[var(--amber-dim)] active:scale-95 transition-all duration-150 text-[var(--amber)] text-[13px] font-medium px-3.5 py-2 rounded-full"
                       >
                         Keep it
                       </button>
                       <Link
                         href={trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel"}
-                        className="bg-[#e65100] hover:bg-[#bf360c] active:scale-95 transition-all duration-150 text-white text-[13px] font-medium px-3.5 py-2 rounded-full"
+                        className="bg-[var(--amber)] hover:bg-[#e68f00] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium px-3.5 py-2 rounded-full"
                       >
                         Cancel it
                       </Link>
                       <button
-                        onClick={dismissTrialAlert}
-                        className="text-[#86868b] hover:text-[#1d1d1f] text-lg w-7 h-7 rounded-full hover:bg-[#ffe0b2] flex items-center justify-center"
+                        onClick={() => { buzz(10); dismissTrialAlert(); }}
+                        className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-7 h-7 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center"
                       >&times;</button>
                     </div>
                   </div>
@@ -1686,18 +1689,18 @@ export default function AppPage() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="card bg-[#f0fdf4] mb-6"
+                  className="card bg-[var(--green-dim)] mb-6"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[15px] font-semibold text-[#1d1d1f] mb-1">Weekly subscription checkup</p>
-                      <p className="text-[13px] text-[#86868b] leading-relaxed">
+                      <p className="text-[15px] font-semibold text-[var(--text)] mb-1">Weekly subscription checkup</p>
+                      <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                         You have {subs.length} active subscriptions totaling {fmtCurrency(monthTotal)}/mo. Still need all of them?
                       </p>
                     </div>
                     <button
                       onClick={() => { setShowWeekly(false); localStorage.setItem("oopssubs_weekly_check", String(Date.now())); }}
-                      className="flex-shrink-0 text-[#86868b] hover:text-[#1d1d1f] text-lg"
+                      className="flex-shrink-0 text-[var(--text-secondary)] hover:text-[var(--text)] text-lg"
                     >&times;</button>
                   </div>
                 </motion.div>
@@ -1712,25 +1715,40 @@ export default function AppPage() {
             })}
 
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Your subscriptions</h2>
-              <button onClick={handleGmailScan} disabled={scanning} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f] font-medium transition-colors">Scan again</button>
+              <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em]">Your subscriptions</h2>
+              <button onClick={() => { buzz(15); handleGmailScan(); }} disabled={scanning} className="text-[13px] text-[var(--text-secondary)] hover:text-[var(--text)] font-medium transition-colors">Scan again</button>
             </div>
             <div className="card p-0 overflow-hidden">
               {subs.sort((a, b) => daysUntil(a.nextDate) - daysUntil(b.nextDate)).map((sub, i) => (
-                <motion.div
-                  key={sub.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 25 }}
-                  exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
-                  className={i !== subs.length - 1 ? 'border-b border-[#e5e5ea]' : ''}
-                >
-                  <SubscriptionRow
-                    sub={sub}
-                    onDelete={() => openProofFlow(sub)}
-                    onCalError={(m) => { setError(m); setTimeout(() => setError(""), 4000); }}
-                  />
-                </motion.div>
+                <div key={sub.id} className="relative">
+                  {/* 左滑露出的取消底層 */}
+                  <div className="absolute inset-y-0 right-0 w-24 bg-[var(--red)] flex items-center justify-center text-[var(--bg)] text-[13px] font-semibold tracking-wide">
+                    Cancel
+                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05, type: "spring", stiffness: 400, damping: 25 }}
+                    exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
+                    className={i !== subs.length - 1 ? 'border-b border-[var(--divider)] bg-[var(--bg-elevated)]' : 'bg-[var(--bg-elevated)]'}
+                    drag="x"
+                    dragConstraints={{ left: -88, right: 0 }}
+                    dragElastic={0.12}
+                    whileDrag={{ scale: 0.97, opacity: 0.92 }}
+                    onDragEnd={(e, info) => {
+                      if (info.offset.x < -80) {
+                        try { navigator.vibrate?.(15); } catch { /* noop */ }
+                        openProofFlow(sub);
+                      }
+                    }}
+                  >
+                    <SubscriptionRow
+                      sub={sub}
+                      onDelete={() => openProofFlow(sub)}
+                      onCalError={(m) => { setError(m); setTimeout(() => setError(""), 4000); }}
+                    />
+                  </motion.div>
+                </div>
               ))}
             </div>
             {/* Subtle Gmail prompt — only when user has subs but no Gmail */}
@@ -1740,8 +1758,8 @@ export default function AppPage() {
                 animate={{ opacity: 1 }}
                 className="card mt-6 text-center py-6"
               >
-                <p className="text-[14px] text-[#86868b] mb-3">Got more subscriptions? Let Gmail find them automatically.</p>
-                <button onClick={handleGmailScan} className="btn-secondary text-[15px] py-3 px-6">
+                <p className="text-[14px] text-[var(--text-secondary)] mb-3">Got more subscriptions? Let Gmail find them automatically.</p>
+                <button onClick={() => { buzz(15); handleGmailScan(); }} className="btn-secondary text-[15px] py-3 px-6">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
                   Connect Gmail
                 </button>
@@ -1754,8 +1772,8 @@ export default function AppPage() {
         {getCancelled().length > 0 && (
           <div className="mt-10">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-semibold text-[#86868b] uppercase tracking-[0.05em]">Cancelled</h2>
-              <span className="text-[12px] text-[#aeaeb2] inline-flex items-center gap-1">
+              <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em]">Cancelled</h2>
+              <span className="text-[12px] text-[var(--text-tertiary)] inline-flex items-center gap-1">
                 with proof
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
@@ -1766,16 +1784,16 @@ export default function AppPage() {
               {getCancelled().slice().reverse().map((c, i) => (
                 <div
                   key={i}
-                  className={`flex items-center justify-between px-5 py-3.5 ${i !== getCancelled().length - 1 ? 'border-b border-[#e5e5ea]' : ''}`}
+                  className={`flex items-center justify-between px-5 py-3.5 ${i !== getCancelled().length - 1 ? 'border-b border-[var(--divider)]' : ''}`}
                 >
                   <div>
-                    <p className="text-[15px] font-medium text-[#1d1d1f]">{c.name}</p>
-                    <p className="text-[12px] text-[#86868b]">{fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr</p>
+                    <p className="text-[15px] font-medium text-[var(--text)]">{c.name}</p>
+                    <p className="text-[12px] text-[var(--text-secondary)]">{fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr</p>
                   </div>
                   {c.proof ? (
                     <button
                       onClick={() => viewProof(c)}
-                      className="p-1.5 rounded-lg text-[#86868b] hover:text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors active:scale-95"
+                      className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors active:scale-95"
                       title="View cancellation proof"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1783,7 +1801,7 @@ export default function AppPage() {
                       </svg>
                     </button>
                   ) : (
-                    <svg className="w-5 h-5 text-[#d2d2d7] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-5 h-5 text-[var(--text-tertiary)] opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                     </svg>
                   )}
@@ -1798,30 +1816,30 @@ export default function AppPage() {
           {proof && (
             <div className="fixed inset-0 z-[60] bg-white flex flex-col animate-fade-in">
               <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
-                <button onClick={closeProofFlow} className="text-[#86868b] text-[26px] leading-none px-2 hover:text-[#1d1d1f] transition-colors" disabled={proof.stage === "done"}>&times;</button>
-                <h2 className="text-[15px] font-semibold text-[#1d1d1f]">Cancel proof</h2>
+                <button onClick={closeProofFlow} className="text-[var(--text-secondary)] text-[26px] leading-none px-2 hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
+                <h2 className="text-[15px] font-semibold text-[var(--text)]">Cancel proof</h2>
                 <div className="w-9" />
               </div>
 
               <div className="flex-1 overflow-y-auto px-6 pb-10">
                 {proof.stage === "select" && (
                   <div className="text-center pt-6">
-                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[#fff3e0] flex items-center justify-center">
-                      <svg className="w-8 h-8 text-[#b25000]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                      <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316zM16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
                       </svg>
                     </div>
-                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Prove it</h3>
-                    <p className="text-[14px] text-[#86868b] leading-relaxed mb-7 max-w-[280px] mx-auto">
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Prove it</h3>
+                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-7 max-w-[280px] mx-auto">
                       {proof.sub.name} — {fmtCurrency(proof.sub.amount)}{proof.sub.cycle === 'monthly' ? '/mo' : proof.sub.cycle === 'yearly' ? '/yr' : '/qtr'}. Upload a screenshot showing it was cancelled.
                     </p>
                     {proof.image ? (
                       <div className="card p-3 mb-6">
-                        <img src={proof.image} alt="Screenshot preview" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />
+                        <img src={proof.image} alt="Screenshot preview" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />
                       </div>
                     ) : (
-                      <div className="h-44 rounded-2xl border-2 border-dashed border-[#d2d2d7] flex flex-col items-center justify-center mb-6 bg-[#fafafa]">
-                        <svg className="w-8 h-8 text-[#aeaeb2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <div className="h-44 rounded-2xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center mb-6 bg-[var(--bg-elevated)]">
+                        <svg className="w-8 h-8 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                         </svg>
                         <p className="text-[13px] mt-2">No screenshot yet</p>
@@ -1834,7 +1852,7 @@ export default function AppPage() {
                       Choose screenshot
                     </button>
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofFile} />
-                    <p className="text-[12px] text-[#aeaeb2] mt-5 leading-relaxed max-w-xs mx-auto">
+                    <p className="text-[12px] text-[var(--text-tertiary)] mt-5 leading-relaxed max-w-xs mx-auto">
                       Screenshots are checked by AI and stored only on this device. The cancellation reminder stays until proof is submitted.
                     </p>
                   </div>
@@ -1843,7 +1861,7 @@ export default function AppPage() {
                 {proof.stage === "reviewing" && (
                   <div className="pt-8">
                     {/* 偵探放大鏡掃描截圖 */}
-                    <div className="relative mx-auto mb-8 w-full max-w-[280px] aspect-[4/3] rounded-2xl bg-[#f5f5f7] overflow-hidden">
+                    <div className="relative mx-auto mb-8 w-full max-w-[280px] aspect-[4/3] rounded-2xl bg-[var(--bg-elevated)] overflow-hidden">
                       {proof.image && <img src={proof.image} alt="Evidence" className="w-full h-full object-contain" />}
                       <motion.div
                         className="absolute"
@@ -1853,16 +1871,16 @@ export default function AppPage() {
                       >
                         {/* 鏡片：外圈陰影把畫面其他部分變暗，像真拿放大鏡在照 */}
                         <div
-                          className="w-16 h-16 rounded-full border-[5px] border-[#1d1d1f] bg-white/10"
+                          className="w-16 h-16 rounded-full border-[5px] border-[var(--text)] bg-white/10"
                           style={{ boxShadow: "0 0 0 9999px rgba(29,29,31,0.35)", marginLeft: -32, marginTop: -32 }}
                         />
                         {/* 鏡柄 */}
-                        <div className="w-1.5 h-10 bg-[#1d1d1f] rounded-full" style={{ transform: "rotate(45deg)", transformOrigin: "top left" }} />
+                        <div className="w-1.5 h-10 bg-[var(--text)] rounded-full" style={{ transform: "rotate(45deg)", transformOrigin: "top left" }} />
                       </motion.div>
                     </div>
                     <div className="text-center">
-                      <p className="text-[16px] font-semibold text-[#1d1d1f] mb-1">Inspector is examining your evidence…</p>
-                      <p className="text-[13px] text-[#86868b]">Looking for the {proof.sub.name} cancellation confirmation.</p>
+                      <p className="text-[16px] font-semibold text-[var(--text)] mb-1">Inspector is examining your evidence…</p>
+                      <p className="text-[13px] text-[var(--text-secondary)]">Looking for the {proof.sub.name} cancellation confirmation.</p>
                     </div>
                   </div>
                 )}
@@ -1870,13 +1888,13 @@ export default function AppPage() {
                 {proof.stage === "result" && (
                   proof.aiError || !proof.verdict?.aiAvailable ? (
                     <div className="text-center pt-10">
-                      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[#f5f5f7] flex items-center justify-center">
-                        <svg className="w-8 h-8 text-[#b25000]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center">
+                        <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                         </svg>
                       </div>
-                      <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">AI check unavailable</h3>
-                      <p className="text-[14px] text-[#86868b] leading-relaxed mb-7 max-w-[280px] mx-auto">
+                      <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">AI check unavailable</h3>
+                      <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-7 max-w-[280px] mx-auto">
                         We couldn&apos;t reach the AI checker right now. You can still submit your screenshot as proof.
                       </p>
                       <button onClick={() => setProof(p => (p ? { ...p, verified: "ai-down", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
@@ -1890,10 +1908,10 @@ export default function AppPage() {
                         animate={{ x: [0, -6, 6, -4, 4, 0] }}
                         transition={{ duration: 0.5 }}
                       >
-                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />}
+                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
-                            className="border-[5px] border-[#2e7d32] text-[#2e7d32] rounded-xl px-8 py-3 text-[24px] font-black tracking-[0.2em] rotate-[-12deg] bg-[#e8f5e9]/50"
+                            className="border-[5px] border-[var(--green)] text-[var(--green)] rounded-xl px-8 py-3 text-[24px] font-black tracking-[0.2em] rotate-[-12deg] bg-[var(--green-dim)]/50"
                             initial={{ scale: 2.5, opacity: 0, rotate: -18 }}
                             animate={{ scale: 1, opacity: 1, rotate: -12 }}
                             transition={{ type: "spring", stiffness: 400, damping: 14 }}
@@ -1903,10 +1921,10 @@ export default function AppPage() {
                         </div>
                       </motion.div>
                       <div className="text-center">
-                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Case closed</h3>
-                        <p className="text-[14px] text-[#86868b] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
+                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Case closed</h3>
+                        <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
                         {proof.verdict.reason && (
-                          <p className="text-[12px] text-[#aeaeb2] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
+                          <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
                       </div>
                       <button onClick={() => setProof(p => (p ? { ...p, verified: "ai", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
@@ -1920,10 +1938,10 @@ export default function AppPage() {
                         animate={{ x: [0, -6, 6, -4, 4, 0] }}
                         transition={{ duration: 0.5 }}
                       >
-                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[#f5f5f7]" />}
+                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
-                            className="border-[5px] border-[#d70015] text-[#d70015] rounded-xl px-6 py-3 text-[22px] font-black tracking-[0.15em] rotate-[8deg] bg-[#ffebee]/50"
+                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-6 py-3 text-[22px] font-black tracking-[0.15em] rotate-[8deg] bg-[var(--red-dim)]/50"
                             initial={{ scale: 2.5, opacity: 0, rotate: 14 }}
                             animate={{ scale: 1, opacity: 1, rotate: 8 }}
                             transition={{ type: "spring", stiffness: 400, damping: 14 }}
@@ -1933,14 +1951,14 @@ export default function AppPage() {
                         </div>
                       </motion.div>
                       <div className="text-center">
-                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-2">Evidence rejected</h3>
-                        <p className="text-[14px] text-[#86868b] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
+                        <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Evidence rejected</h3>
+                        <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
                         {proof.verdict.reason && (
-                          <p className="text-[12px] text-[#aeaeb2] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
+                          <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
                       </div>
                       <button onClick={() => setProof(p => (p ? { ...p, stage: "select", verdict: null, aiError: false, line: "", image: null } : p))} className="btn-secondary text-[16px] py-4 w-full mb-3">Choose another screenshot</button>
-                      <button onClick={() => setProof(p => (p ? { ...p, verified: "skipped", stage: "confirm" } : p))} className="block mx-auto text-[13px] text-[#86868b] underline hover:text-[#1d1d1f] transition-colors">
+                      <button onClick={() => setProof(p => (p ? { ...p, verified: "skipped", stage: "confirm" } : p))} className="block mx-auto text-[13px] text-[var(--text-secondary)] underline hover:text-[var(--text)] transition-colors">
                         I did cancel it — skip AI check
                       </button>
                     </div>
@@ -1949,8 +1967,8 @@ export default function AppPage() {
 
                 {proof.stage === "confirm" && (
                   <div className="pt-6">
-                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f] mb-1">Last step</h3>
-                    <p className="text-[13px] text-[#86868b] mb-6">Confirm all three before the hold button activates.</p>
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-1">Last step</h3>
+                    <p className="text-[13px] text-[var(--text-secondary)] mb-6">Confirm all three before the hold button activates.</p>
                     <div className="card p-0 overflow-hidden mb-7">
                       {[
                         `This screenshot is from ${proof.sub.name}`,
@@ -1960,10 +1978,10 @@ export default function AppPage() {
                         <button
                           key={i}
                           onClick={() => setProof(p => (p ? { ...p, checks: p.checks.map((v, j) => (j === i ? !v : v)) as [boolean, boolean, boolean] } : p))}
-                          className={`w-full flex items-center justify-between gap-3 px-5 py-4 text-left ${i !== 2 ? 'border-b border-[#e5e5ea]' : ''}`}
+                          className={`w-full flex items-center justify-between gap-3 px-5 py-4 text-left ${i !== 2 ? 'border-b border-[var(--divider)]' : ''}`}
                         >
-                          <span className="text-[14px] text-[#1d1d1f]">{label}</span>
-                          <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-white text-[12px] flex-shrink-0 ${proof.checks[i] ? 'bg-[#2e7d32] border-[#2e7d32]' : 'border-[#d2d2d7]'}`}>
+                          <span className="text-[14px] text-[var(--text)]">{label}</span>
+                          <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[var(--bg)] text-[12px] flex-shrink-0 ${proof.checks[i] ? 'bg-[var(--green)] border-[var(--green)]' : 'border-[var(--border)]'}`}>
                             {proof.checks[i] ? '✓' : ''}
                           </span>
                         </button>
@@ -1975,7 +1993,7 @@ export default function AppPage() {
                       onPointerUp={endHold}
                       onPointerLeave={endHold}
                       onPointerCancel={endHold}
-                      className={`relative w-full py-5 rounded-2xl text-white text-[16px] font-semibold overflow-hidden select-none active:scale-[0.99] transition-colors ${proof.checks.every(Boolean) ? 'bg-[#d70015]' : 'bg-[#d2d2d7]'}`}
+                      className={`relative w-full py-5 rounded-2xl text-[var(--bg)] text-[16px] font-semibold overflow-hidden select-none active:scale-[0.99] transition-colors ${proof.checks.every(Boolean) ? 'bg-[var(--red)]' : 'bg-[var(--bg-active)]'}`}
                     >
                       <span className="relative z-10">
                         {!proof.checks.every(Boolean)
@@ -1989,7 +2007,7 @@ export default function AppPage() {
                         style={{ width: `${proof.hold * 100}%` }}
                       />
                     </button>
-                    <p className="text-[12px] text-[#aeaeb2] mt-4 text-center">
+                    <p className="text-[12px] text-[var(--text-tertiary)] mt-4 text-center">
                       {proof.verified === "skipped" ? "AI check skipped at your request." : "This is a binding confirmation of your cancellation."}
                     </p>
                   </div>
@@ -2002,7 +2020,7 @@ export default function AppPage() {
                       animate={{ scale: 1, opacity: 1, rotate: -10 }}
                       transition={{ type: "spring", stiffness: 250, damping: 14 }}
                     >
-                      <div className="border-4 border-[#d70015] text-[#d70015] rounded-xl px-10 py-4 text-[26px] font-black tracking-[0.2em] shadow-lg">
+                      <div className="border-4 border-[var(--red)] text-[var(--red)] rounded-xl px-10 py-4 text-[26px] font-black tracking-[0.2em] shadow-lg">
                         CANCELLED
                       </div>
                     </motion.div>
@@ -2010,7 +2028,7 @@ export default function AppPage() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.4 }}
-                      className="text-[14px] text-[#86868b] mt-6"
+                      className="text-[14px] text-[var(--text-secondary)] mt-6"
                     >
                       {proof.sub.name} is cancelled. Proof saved.
                     </motion.p>
@@ -2031,8 +2049,8 @@ export default function AppPage() {
               exit={{ opacity: 0 }}
             >
               <div className="flex items-center justify-between px-6 pt-6 pb-3">
-                <p className="text-[14px] font-semibold text-white">Proof — {proofViewer.name}</p>
-                <button onClick={() => setProofViewer(null)} className="text-white/70 text-[26px] leading-none px-2 hover:text-white transition-colors">&times;</button>
+                <p className="text-[14px] font-semibold text-[var(--bg)]">Proof — {proofViewer.name}</p>
+                <button onClick={() => setProofViewer(null)} className="text-[var(--bg)]/70 text-[26px] leading-none px-2 hover:text-[var(--bg)] transition-colors">&times;</button>
               </div>
               <div className="flex-1 flex items-center justify-center px-4 pb-10 overflow-hidden">
                 <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
@@ -2064,13 +2082,13 @@ export default function AppPage() {
                 onDragEnd={(_, info) => { if (info.velocity.y > 500 || info.offset.y > 150) setShowAdd(false); }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-8 h-1 rounded-full bg-[#d2d2d7] mx-auto mb-5" />
+                <div className="w-8 h-1 rounded-full bg-[var(--bg-active)] mx-auto mb-5" />
                 <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-5">New subscription</h3>
                 <div className="space-y-3">
                   <input className="input-apple" placeholder="Service name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <span className="absolute left-4 top-[14px] text-[15px] text-[#aeaeb2] font-medium">$</span>
+                      <span className="absolute left-4 top-[14px] text-[15px] text-[var(--text-tertiary)] font-medium">$</span>
                       <input className="input-apple pl-8" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
                     </div>
                     <select className="select-apple w-auto" value={form.cycle} onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as any }))}>
@@ -2081,16 +2099,16 @@ export default function AppPage() {
                   </div>
                   <input className="input-apple" type="date" value={form.nextDate} onChange={(e) => setForm((f) => ({ ...f, nextDate: e.target.value }))} />
                   <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
-                    <input type="checkbox" checked={form.isTrial} onChange={(e) => setForm((f) => ({ ...f, isTrial: e.target.checked }))} className="w-4 h-4 accent-[#e65100]" />
-                    <span className="text-[14px] text-[#1d1d1f] font-medium">This is a free trial</span>
+                    <input type="checkbox" checked={form.isTrial} onChange={(e) => setForm((f) => ({ ...f, isTrial: e.target.checked }))} className="w-4 h-4 accent-[var(--amber)]" />
+                    <span className="text-[14px] text-[var(--text)] font-medium">This is a free trial</span>
                   </label>
                   {form.isTrial && (
                     <div className="space-y-3 pt-1">
                       <div>
-                        <label className="text-[12px] text-[#86868b] mb-1 block">Trial ends</label>
+                        <label className="text-[12px] text-[var(--text-secondary)] mb-1 block">Trial ends</label>
                         <input className="input-apple" type="date" value={form.trialEnd} onChange={(e) => setForm((f) => ({ ...f, trialEnd: e.target.value }))} />
                       </div>
-                      <p className="text-[12px] text-[#aeaeb2] leading-relaxed">Amount above is charged after the trial ends.</p>
+                      <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">Amount above is charged after the trial ends.</p>
                     </div>
                   )}
                   <div className="flex gap-2 pt-2">
@@ -2116,28 +2134,28 @@ export default function AppPage() {
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-8 h-1 rounded-full bg-[#d2d2d7] mx-auto mb-5" />
+                <div className="w-8 h-1 rounded-full bg-[var(--bg-active)] mx-auto mb-5" />
                 <div className="text-center mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-[#f5f5f7] flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-[#1d1d1f]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+                  <div className="w-16 h-16 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-[var(--text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
                   </div>
                   <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-2">One quick thing</h3>
-                  <p className="text-[14px] text-[#86868b] leading-relaxed">
-                    Google will show a warning: <strong className="text-[#1d1d1f]">"Google hasn&apos;t verified this app"</strong>. This is standard for all new apps — our verification is in progress.
+                  <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed">
+                    Google will show a warning: <strong className="text-[var(--text)]">"Google hasn&apos;t verified this app"</strong>. This is standard for all new apps — our verification is in progress.
                   </p>
                 </div>
-                <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[#86868b]">
+                <div className="bg-[var(--bg-elevated)] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[var(--text-secondary)]">
                   <div className="flex gap-3">
-                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
-                    <span>OopsSubs only looks for subscription receipts. We <strong className="text-[#1d1d1f]">cannot modify, delete, or send</strong> emails.</span>
+                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span>OopsSubs only looks for subscription receipts. We <strong className="text-[var(--text)]">cannot modify, delete, or send</strong> emails.</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
-                    <span>Your email content is processed <strong className="text-[#1d1d1f]">locally in your browser</strong>. Nothing is uploaded to any server.</span>
+                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span>Your email content is processed <strong className="text-[var(--text)]">locally in your browser</strong>. Nothing is uploaded to any server.</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="text-[#2e7d32] flex-shrink-0">✓</span>
-                    <span>You can revoke access anytime at <strong className="text-[#1d1d1f]">myaccount.google.com/permissions</strong>.</span>
+                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span>You can revoke access anytime at <strong className="text-[var(--text)]">myaccount.google.com/permissions</strong>.</span>
                   </div>
                 </div>
                 <button
@@ -2168,7 +2186,7 @@ export default function AppPage() {
                 >
                   I understand — continue
                 </button>
-                <button onClick={() => setShowTrustModal(false)} className="text-[13px] text-[#86868b] w-full text-center mt-3 py-2">Cancel</button>
+                <button onClick={() => setShowTrustModal(false)} className="text-[13px] text-[var(--text-secondary)] w-full text-center mt-3 py-2">Cancel</button>
               </motion.div>
             </div>
           )}
@@ -2186,19 +2204,19 @@ export default function AppPage() {
                 exit={{ scale: 0.9, opacity: 0 }}
               >
                 <h3 className="text-[22px] font-extrabold tracking-[-0.02em] mb-2">You found {subs.length} subscriptions</h3>
-                <p className="text-[15px] text-[#86868b] mb-6">
+                <p className="text-[15px] text-[var(--text-secondary)] mb-6">
                   The free version tracks up to {FREE_LIMIT}. Unlock unlimited tracking and all Pro features.
                 </p>
                 <div className="text-center mb-6">
-                  <p className="text-[14px] text-[#86868b] line-through">$19.99</p>
+                  <p className="text-[14px] text-[var(--text-secondary)] line-through">$19.99</p>
                   <p className="text-[36px] font-extrabold tracking-[-0.02em]">$9.99</p>
-                  <p className="text-[13px] text-[#86868b]">one-time · no subscription</p>
+                  <p className="text-[13px] text-[var(--text-secondary)]">one-time · no subscription</p>
                 </div>
                 <button onClick={handleBuyPro} disabled={buying} className="btn-primary w-full mb-3 disabled:opacity-50">
                   {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
                 </button>
                 {buyError && <p className="text-[13px] text-red-600 mb-3 text-center">{buyError}</p>}
-                <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[#86868b] w-full text-center">Maybe later</button>
+                <button onClick={() => setShowPaywall(false)} className="text-[13px] text-[var(--text-secondary)] w-full text-center">Maybe later</button>
               </motion.div>
             </div>
           )}
