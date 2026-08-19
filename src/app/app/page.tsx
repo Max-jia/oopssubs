@@ -1604,7 +1604,8 @@ export default function AppPage() {
 
   const monthTotal = totalMonthly(subs);
   const [dismissedUrgent, setDismissedUrgent] = useState<string[]>([]);
-  const urgentSubs = subs.filter(s => daysUntil(s.nextDate) === 1);
+  // 到期提醒:明天續費 或 今天/已過期(試用除外——試用有專屬卡)
+  const urgentSubs = subs.filter(s => !s.isTrial && daysUntil(s.nextDate) <= 1);
   // 橫幅排隊:一次只顯示最急的一塊(trial 明天扣錢 > urgent 明天扣錢 > 追債 > 週檢)
   const bannerPriority = trialAlert ? 'trial'
     : urgentSubs.filter(s => !dismissedUrgent.includes(s.id)).length > 0 ? 'urgent'
@@ -1631,7 +1632,9 @@ export default function AppPage() {
           <div className="max-w-md mx-auto px-1 py-1">
             <div className="flex items-baseline justify-between gap-3 mb-3">
               <div className="min-w-0">
-                <p className="text-[12px] text-[var(--text-on-card-strong)] mb-0.5">Renews tomorrow</p>
+                <p className="text-[12px] text-[var(--text-on-card-strong)] mb-0.5">
+                {daysUntil(s.nextDate) === 1 ? 'Renews tomorrow' : 'Due today'}
+              </p>
                 <p className="text-[17px] font-semibold truncate">{s.name}</p>
               </div>
               <span className="text-[15px] font-bold text-[var(--text-on-card-strong)] flex-shrink-0">{fmtCurrency(s.amount)}</span>
