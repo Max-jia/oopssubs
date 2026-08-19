@@ -58,6 +58,7 @@ interface ProofRecord {
   at: number;
 }
 interface CancelledSub { name: string; amount: number; cycle: string; date: string; subId?: string; proof?: ProofRecord; }
+interface Celebration extends CancelledSub { caseNo: number; rankTitle: string; rankUp: boolean; }
 function getCancelled(): CancelledSub[] {
   try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || '[]'); }
   catch { return []; }
@@ -273,6 +274,31 @@ function loadSubs(): Subscription[] {
   catch { return []; }
 }
 function saveSubs(subs: Subscription[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(subs)); }
+
+/* ── 偵探等級系統:破案數 + 連續破案 streak ── */
+const DETECTIVE_KEY = "oopssubs_detective";
+interface DetectiveState { cases: number; streak: number; lastCaseAt: string; }
+function getDetective(): DetectiveState {
+  try { return JSON.parse(localStorage.getItem(DETECTIVE_KEY) || '{"cases":0,"streak":0,"lastCaseAt":""}'); }
+  catch { return { cases: 0, streak: 0, lastCaseAt: "" }; }
+}
+// 破案一次:streak 30 天內連續計,超過重置為 1
+function recordCase(): DetectiveState {
+  const d = getDetective();
+  const now = new Date();
+  const last = d.lastCaseAt ? new Date(d.lastCaseAt) : null;
+  const streak = last && now.getTime() - last.getTime() < 30 * 864e5 ? d.streak + 1 : 1;
+  const next = { cases: d.cases + 1, streak, lastCaseAt: now.toISOString() };
+  localStorage.setItem(DETECTIVE_KEY, JSON.stringify(next));
+  return next;
+}
+function detectiveRank(cases: number): { title: string; next: string | null; need: number } {
+  if (cases >= 30) return { title: "Chief Inspector", next: null, need: 0 };
+  if (cases >= 15) return { title: "Inspector", next: "Chief Inspector", need: 30 };
+  if (cases >= 5) return { title: "Detective", next: "Inspector", need: 15 };
+  if (cases >= 1) return { title: "Junior Detective", next: "Detective", need: 5 };
+  return { title: "Cadet", next: "Junior Detective", need: 1 };
+}
 // 去重檢查:同名(忽略大小寫與首尾空格)視為已存在
 function hasDuplicate(subs: Subscription[], name: string): boolean {
   const n = name.trim().toLowerCase();
@@ -998,7 +1024,8 @@ export default function AppPage() {
   const [mounted, setMounted] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
   const [followUpCancel, setFollowUpCancel] = useState<PendingCancel | null>(null);
-  const [celebration, setCelebration] = useState<CancelledSub | null>(null);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const [detective, setDetective] = useState<DetectiveState>(() => getDetective());
   const [showWeekly, setShowWeekly] = useState(false);
   const [trialAlert, setTrialAlert] = useState<(Subscription & { slug: string | null }) | null>(null);
   const [pro, setPro] = useState(false);
@@ -1385,7 +1412,18 @@ export default function AppPage() {
       const updated = subs.filter((s) => s.id !== id);
       setSubs(updated); saveSubs(updated);
       setLeaving(null);
-      if (deleted) { setCelebration({ name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString() }); setTimeout(() => setCelebration(null), 5000); }
+      if (deleted) {
+        // 偵探系統:破案紀錄 + 等級比較
+        const det = recordCase();
+        setDetective(det);
+        const rankBefore = detectiveRank(det.cases - 1);
+        const rankAfter = detectiveRank(det.cases);
+        setCelebration({
+          name: deleted.name, amount: deleted.amount, cycle: deleted.cycle, date: new Date().toISOString(),
+          caseNo: det.cases, rankTitle: rankAfter.title, rankUp: rankBefore.title !== rankAfter.title,
+        });
+        setTimeout(() => setCelebration(null), 6000);
+      }
     }, 280);
   }, [subs]);
 
@@ -1653,6 +1691,20 @@ export default function AppPage() {
       )}
 
       <main className="min-h-screen max-w-md mx-auto px-6 py-8 animate-fade-in">
+        {/* 偵探等級:破案數 + streak */}
+        {detective.cases > 0 && (
+          <div className="text-center mb-6 animate-slide-down">
+            <p className="text-[11px] font-bold tracking-[0.1em] text-[var(--brand)] uppercase">
+              {detectiveRank(detective.cases).title}
+            </p>
+            <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+              {detective.cases} case{detective.cases > 1 ? 's' : ''} closed · {detective.streak} streak
+            </p>
+            <Link href="/report" className="inline-block text-[12px] text-[var(--brand)] mt-1 hover:text-[var(--brand-strong)] transition-colors">
+              View case report →
+            </Link>
+          </div>
+        )}
         {/* Lifetime savings */}
         {lifetimeSavings() > 0 && (
           <div className="text-center mb-8">
@@ -1678,18 +1730,33 @@ export default function AppPage() {
               initial={{ y: -50, opacity: 0, scale: 0.9 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: -50, opacity: 0 }}
-              className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[var(--text)] text-[var(--bg)] rounded-3xl px-6 py-5 shadow-2xl flex items-center gap-4"
+              className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto bg-[var(--text)] text-[var(--bg)] rounded-3xl px-6 py-5 shadow-2xl"
             >
-              <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/15">
-                <svg className="w-5 h-5 text-[var(--bg)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-              </span>
-              <div className="flex-1">
-                <p className="text-[14px] font-semibold">Cancelled {celebration.name}!</p>
-                <p className="text-[13px] text-[var(--text-on-card-strong)]">
-                  You just saved {fmtCurrency(celebration.cycle === 'yearly' ? celebration.amount : celebration.amount * 12)}/year
-                </p>
+              <div className="flex items-center gap-4">
+                <motion.span
+                  className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 flex-shrink-0"
+                  initial={{ rotate: -20, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 15, delay: 0.1 }}
+                >
+                  {/* 徽章:圓形 + 星形 */}
+                  <svg className="w-6 h-6 text-[var(--brand-strong)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l1.9 5.6 5.6 1.9-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9L12 3z" />
+                  </svg>
+                </motion.span>
+                <div className="flex-1">
+                  <p className="text-[12px] font-black tracking-[0.14em] text-[var(--brand-strong)]">
+                    CASE #{celebration.caseNo} CLOSED
+                  </p>
+                  <p className="text-[16px] font-semibold mt-0.5">
+                    {celebration.name} — saved {fmtCurrency(celebration.cycle === 'yearly' ? celebration.amount : celebration.amount * 12)}/year
+                  </p>
+                  {celebration.rankUp && (
+                    <p className="text-[12px] font-bold text-[var(--brand-strong)] mt-1 animate-pop-in">
+                      ★ PROMOTED TO {celebration.rankTitle.toUpperCase()}
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
@@ -1782,19 +1849,23 @@ export default function AppPage() {
           </div>
         )}
 
-        {/* Scanned items */}
+        {/* Scanned items — 線索板 */}
         {scannedItems.length > 0 && (
           <div className="mb-8 animate-slide-down">
-            <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em] mb-3">Found in your inbox</h2>
-            <div className="space-y-2 stagger-item">
+            <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.05em] mb-3">New clues found</h2>
+            <div className="evidence-board stagger-item">
               {scannedItems.map((item, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 16, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: i * 0.08, type: "spring", stiffness: 400, damping: 22 }}
-                  className={`card flex items-center justify-between gap-3 py-4 px-5 ${item.isTrial ? 'border-[var(--amber)] bg-[var(--amber-dim)]' : ''}`}
+                  initial={{ opacity: 0, y: 20, scale: 0.9, rotate: i % 2 === 0 ? -6 : 6 }}
+                  animate={{ opacity: 1, y: 0, scale: 1, rotate: i % 2 === 0 ? -1.5 : 1.5 }}
+                  transition={{ delay: i * 0.1, type: "spring", stiffness: 350, damping: 20 }}
+                  className={`relative card flex items-center justify-between gap-3 py-4 px-5 mb-2.5 ${item.isTrial ? 'border-[var(--amber)] bg-[var(--amber-dim)]' : ''}`}
                 >
+                  {/* 圖釘 */}
+                  <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-gradient-to-b from-[var(--text-secondary)] to-[var(--text-tertiary)] shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
+                  {/* NEW CLUE 標籤 */}
+                  <span className="absolute top-2 right-3 text-[9px] font-black tracking-[0.12em] text-[var(--brand)]">NEW CLUE</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <div className="text-[15px] font-semibold">{item.name}</div>

@@ -259,6 +259,16 @@
 .animate-pop-in { animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-bounce-up { animation: bounce-up 0.6s ease-out; }
 
+/* ── 線索板(掃描結果釘卡) ── */
+.evidence-board {
+  background-color: var(--bg-elevated);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 14px 14px 4px;
+}
+
 /* ── 列表行退場(取消成功時滑出) ── */
 @keyframes rowLeave {
   0% { opacity: 1; transform: translateX(0); background-color: rgba(48, 209, 88, 0.16); }

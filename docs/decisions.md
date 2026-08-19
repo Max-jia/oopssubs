@@ -41,3 +41,7 @@
 - **清單數量改程式自動計算**：首頁「View all 79 services →」與 pricing「Cancel guide for 79+ services」為硬編碼，實際清單已 80 個（8/16 加入 Gemini 時決策紀錄誤寫 82，程式碼實測 80）。改為 `cancelGuides.length` 動態顯示，日後增減清單不會再不同步。
 - **Pricing 只列 Android 功能**：移除「iOS App Store subscription scanner」條目——目前僅 Android 版，iOS 版未開發，不預先承諾。
 - **隱私主張精簡**：頁尾信任卡原標題「No server. No database. No tracking.」與首屏標語重複講同一件事，改為「Private by design」+ 單行說明，去掉重複。
+
+## 2026-08-19（待辦紀錄）
+
+- **Cancel now 跳轉教學頁未生效(待修)**:urgent banner「Cancel now」在 App 內點擊後未跳轉到對應教學頁/列表。已排除 overlay 攔截(已修)、window.open(已改 location.href)、匹配邏輯(本地驗證 cancelSlugFor 正常)。v30 後用戶實測仍未跳轉——**待排查**(可能 App 內 location.href 導航被 Capacitor 攔截,或按鈕點擊未觸發)。測試環境 localhost 下 mouse 點擊可跳轉,但用戶實測不行——懷疑 Capacitor WebView 的導航處理差異。
