@@ -1928,37 +1928,35 @@ export default function AppPage() {
                   exit={{ opacity: 0, y: -10 }}
                   className="card bg-[var(--amber-dim)] border border-[var(--amber)] mb-6"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[15px] font-semibold text-[var(--text)] mb-1">
-                        {daysUntil(trialAlert.nextDate) === 0
-                          ? `Today: ${trialAlert.name} free trial ends`
-                          : `${trialAlert.name} trial ended — you may have been charged`}
-                      </p>
-                      <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-                        {daysUntil(trialAlert.nextDate) === 0
-                          ? `It will auto-charge ${fmtCurrency(trialAlert.amount)} today.`
-                          : `You may have been charged ${fmtCurrency(trialAlert.amount)}. Keep it or cancel?`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => { buzz(15); keepTrial(); }}
-                        className="bg-[var(--amber-dim)] hover:bg-[var(--amber-dim)] active:scale-95 transition-all duration-150 text-[var(--amber)] text-[13px] font-medium px-3.5 py-2 rounded-full"
-                      >
-                        Keep it
-                      </button>
-                      <Link
-                        href={isNativeApp() ? (trialAlert.slug ? `/cancel/${trialAlert.slug}/index.html` : "/cancel/index.html") : (trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel")}
-                        className="bg-[var(--amber)] hover:bg-[#e68f00] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium px-3.5 py-2 rounded-full"
-                      >
-                        Cancel it
-                      </Link>
-                      <button
-                        onClick={() => { buzz(10); dismissTrialAlert(); }}
-                        className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-7 h-7 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center"
-                      >&times;</button>
-                    </div>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <p className="text-[15px] font-semibold text-[var(--text)]">
+                      {daysUntil(trialAlert.nextDate) === 0
+                        ? `Today: ${trialAlert.name} free trial ends`
+                        : `${trialAlert.name} trial ended — you may have been charged`}
+                    </p>
+                    <button
+                      onClick={() => { buzz(10); dismissTrialAlert(); }}
+                      className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-7 h-7 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center flex-shrink-0"
+                    >&times;</button>
+                  </div>
+                  <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4">
+                    {daysUntil(trialAlert.nextDate) === 0
+                      ? `It will auto-charge ${fmtCurrency(trialAlert.amount)} today.`
+                      : `You may have been charged ${fmtCurrency(trialAlert.amount)}. Keep it or cancel?`}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { buzz(15); keepTrial(); }}
+                      className="flex-1 bg-[var(--amber-dim)] hover:bg-[var(--amber-dim)] active:scale-95 transition-all duration-150 text-[var(--amber)] text-[13px] font-medium py-2.5 rounded-full"
+                    >
+                      Keep it
+                    </button>
+                    <Link
+                      href={isNativeApp() ? (trialAlert.slug ? `/cancel/${trialAlert.slug}/index.html` : "/cancel/index.html") : (trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel")}
+                      className="flex-1 bg-[var(--amber)] hover:bg-[#e68f00] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium py-2.5 rounded-full text-center"
+                    >
+                      Cancel it
+                    </Link>
                   </div>
                 </motion.div>
               )}

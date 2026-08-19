@@ -86,7 +86,9 @@ export default function HomePage() {
           transition={{ delay: 0.65, duration: 0.5 }}
         >
           <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1">Closed cases</p>
-          <div className="flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x">
+          <div className="relative">
+            <span className="evidence-sweep" />
+            <div className="flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x">
             {[
               { no: 7, name: 'Netflix', rec: '$367' },
               { no: 12, name: 'Hulu', rec: '$95' },
@@ -96,18 +98,8 @@ export default function HomePage() {
               <motion.div
                 key={c.no}
                 initial={{ opacity: 0, y: 16, rotate: i % 2 === 0 ? -5 : 5 }}
-                animate={{
-                  opacity: 1,
-                  y: [0, -5, 0],
-                  rotate: i % 2 === 0 ? -1.5 : 1.5,
-                  scale: [1, 1.03, 1],
-                }}
-                transition={{
-                  y: { duration: 3.2, repeat: Infinity, delay: 1.2 + i * 0.9, ease: "easeInOut" },
-                  scale: { duration: 3.2, repeat: Infinity, delay: 1.2 + i * 0.9, ease: "easeInOut" },
-                  opacity: { delay: 0.75 + i * 0.1, duration: 0.4 },
-                  rotate: { delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 },
-                }}
+                animate={{ opacity: 1, y: 0, rotate: i % 2 === 0 ? -1.5 : 1.5 }}
+                transition={{ delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 }}
                 className="relative card w-[150px] flex-shrink-0 snap-start py-4"
               >
                 <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gradient-to-b from-[var(--text-secondary)] to-[var(--text-tertiary)] shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
@@ -115,12 +107,13 @@ export default function HomePage() {
                 <p className="text-[14px] font-semibold truncate">{c.name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-[11px] text-[var(--green)] font-semibold">{c.rec} recovered</span>
-                  <span className="text-[9px] font-black tracking-[0.1em] text-[var(--green)] border border-[var(--green)] rounded px-1.5 py-0.5 rotate-[-8deg]">
+                  <span className="stamp-pulse text-[9px] font-black tracking-[0.1em] text-[var(--green)] border border-[var(--green)] rounded px-1.5 py-0.5 rotate-[-8deg]">
                     CLOSED
                   </span>
                 </div>
               </motion.div>
             ))}
+            </div>
           </div>
         </motion.div>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
