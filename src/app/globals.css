@@ -43,6 +43,29 @@
 }
 
 @layer components {
+  /* ── Gold button(首頁主 CTA) ── */
+  .btn-gold {
+    @apply relative overflow-hidden bg-[var(--brand)] text-[var(--bg)] px-6 py-3.5 rounded-full font-semibold
+           active:scale-[0.94] active:bg-[var(--brand-strong)]
+           transition-[transform,background-color] duration-[300ms]
+           disabled:opacity-40 disabled:cursor-not-allowed
+           inline-flex items-center justify-center gap-2 text-[15px] tracking-[-0.01em];
+  }
+  .btn-gold::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--ripple-x, 50%) var(--ripple-y, 50%), rgba(0,0,0,0.25) 0%, transparent 60%);
+    transition: opacity 0.4s ease-out;
+  }
+  .btn-gold:active::before {
+    opacity: 1;
+    transition: opacity 0s;
+  }
+
   /* ── Primary button ── */
   .btn-primary {
     @apply relative overflow-hidden bg-[var(--text)] text-[var(--bg)] px-6 py-3.5 rounded-full font-semibold
@@ -258,6 +281,41 @@
 .animate-scale-in { animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-pop-in { animation: popIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 .animate-bounce-up { animation: bounce-up 0.6s ease-out; }
+
+/* ── 偵探筆記本格線(首頁背景) ── */
+.notebook-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ── CONFIDENTIAL 開場章 ── */
+@keyframes stampIn {
+  0% { transform: scale(2.2) rotate(-14deg); opacity: 0; }
+  55% { transform: scale(0.95) rotate(-9deg); opacity: 1; }
+  70% { transform: scale(1.05) rotate(-9deg); }
+  100% { transform: scale(1) rotate(-9deg); opacity: 1; }
+}
+.stamp-in { animation: stampIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes stampFade {
+  to { opacity: 0; transform: scale(1.08) rotate(-9deg); }
+}
+.stamp-fade { animation: stampFade 0.4s ease-out forwards; }
+
+/* ── 標語金色掃光 ── */
+@keyframes sweepLight {
+  0% { transform: translateX(-120%); }
+  60% { transform: translateX(120%); }
+  100% { transform: translateX(120%); }
+}
+.sweep-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 40%, rgba(255, 179, 64, 0.14) 50%, transparent 60%);
+  animation: sweepLight 1.6s ease-in-out 0.6s 1 forwards;
+}
 
 /* ── 線索板(掃描結果釘卡) ── */
 .evidence-board {

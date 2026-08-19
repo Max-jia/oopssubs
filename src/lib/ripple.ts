@@ -7,7 +7,7 @@ export function enableRipple() {
   registered = true;
   document.addEventListener("pointerdown", (e) => {
     const target = e.target as HTMLElement;
-    const btn = target.closest?.(".btn-primary, .btn-secondary");
+    const btn = target.closest?.(".btn-primary, .btn-secondary, .btn-gold");
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     const span = document.createElement("span");

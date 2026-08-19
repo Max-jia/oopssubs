@@ -27,14 +27,26 @@ export default function HomePage() {
     setIsNative(isNativeApp());
   }, []);
   return (
-    <main className="min-h-screen animate-fade-in">
+    <main className="min-h-screen notebook-grid animate-fade-in overflow-x-hidden">
+      {/* 開場:CONFIDENTIAL 章蓋下後淡出 */}
+      <motion.div
+        className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+        initial={{ opacity: 1 }}
+        animate={{ opacity: 0 }}
+        transition={{ delay: 1.4, duration: 0.4 }}
+      >
+        <span className="stamp-in text-[34px] font-black tracking-[0.2em] text-[var(--red)] border-4 border-[var(--red)] rounded-xl px-6 py-3">
+          CONFIDENTIAL
+        </span>
+      </motion.div>
+
       {/* Hero */}
       <div className="max-w-md mx-auto px-6 pt-20 pb-14 text-center">
         <motion.div
-          className="mb-8"
+          className="mb-8 relative"
           initial={{ scale: 0, rotate: -10 }}
           animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.25 }}
         >
           <motion.img
             src="/logo-gold.png"
@@ -46,18 +58,65 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
-        <motion.h1
-          className="text-[32px] font-extrabold tracking-[-0.02em] text-[var(--text)] mb-10 leading-[1.15]"
+        <motion.div
+          className="relative inline-block mb-3"
           initial={{ y: 16 }}
           animate={{ y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          transition={{ delay: 0.35, duration: 0.5 }}
         >
-          Stop bleeding<br /><span className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">on subscriptions</span>
-        </motion.h1>
+          <span className="sweep-light" />
+          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2]">
+            Some subscriptions are<br /><span className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">hiding from you.</span>
+          </h1>
+        </motion.div>
+        <motion.p
+          className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          Every month, forgotten services take money from your account.<br />Time to investigate.
+        </motion.p>
+
+        {/* 證據牆:已破案案例(橫向滑動) */}
+        <motion.div
+          className="mb-8 text-left"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65, duration: 0.5 }}
+        >
+          <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1">Closed cases</p>
+          <div className="flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x">
+            {[
+              { no: 7, name: 'Netflix', rec: '$367' },
+              { no: 12, name: 'Hulu', rec: '$95' },
+              { no: 23, name: 'Spotify', rec: '$131' },
+              { no: 31, name: 'Adobe CC', rec: '$599' },
+            ].map((c, i) => (
+              <motion.div
+                key={c.no}
+                initial={{ opacity: 0, y: 16, rotate: i % 2 === 0 ? -5 : 5 }}
+                animate={{ opacity: 1, y: 0, rotate: i % 2 === 0 ? -1.5 : 1.5 }}
+                transition={{ delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 }}
+                className="relative card w-[150px] flex-shrink-0 snap-start py-4"
+              >
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gradient-to-b from-[var(--text-secondary)] to-[var(--text-tertiary)] shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
+                <p className="text-[9px] font-black tracking-[0.12em] text-[var(--text-tertiary)] mb-1">CASE #{c.no}</p>
+                <p className="text-[14px] font-semibold truncate">{c.name}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-[11px] text-[var(--green)] font-semibold">{c.rec} recovered</span>
+                  <span className="text-[9px] font-black tracking-[0.1em] text-[var(--green)] border border-[var(--green)] rounded px-1.5 py-0.5 rotate-[-8deg]">
+                    CLOSED
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
             href={appHref("manual", isNative)}
-            className="btn-primary text-[17px] font-semibold py-4 w-full"
+            className="btn-gold text-[17px] font-semibold py-4 w-full"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -70,11 +129,11 @@ export default function HomePage() {
             >
               {iconPaths.plus}
             </motion.svg>
-            Add subscriptions manually
+            File a report manually
           </motion.a>
           <motion.a
             href={appHref("scan", isNative)}
-            className="btn-secondary text-[17px] py-4 w-full"
+            className="btn-primary text-[17px] py-4 w-full"
             whileTap={{ scale: 0.94 }}
             whileHover={{ scale: 1.02, y: -2 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
@@ -87,7 +146,7 @@ export default function HomePage() {
             >
               {iconPaths.mail}
             </motion.svg>
-            Connect Gmail to scan
+            Search your inbox for clues
           </motion.a>
         </div>
         <motion.a

@@ -11,12 +11,12 @@ function getDetective() {
   try { return JSON.parse(localStorage.getItem(DETECTIVE_KEY) || '{"cases":0,"streak":0,"lastCaseAt":""}'); }
   catch { return { cases: 0, streak: 0, lastCaseAt: "" }; }
 }
-function rank(cases: number): { title: string; next: string | null } {
-  if (cases >= 30) return { title: "Chief Inspector", next: null };
-  if (cases >= 15) return { title: "Inspector", next: "Chief Inspector" };
-  if (cases >= 5) return { title: "Detective", next: "Inspector" };
-  if (cases >= 1) return { title: "Junior Detective", next: "Detective" };
-  return { title: "Cadet", next: "Junior Detective" };
+function rank(cases: number): { title: string; next: string | null; need: number; progress: number } {
+  if (cases >= 30) return { title: "Chief Inspector", next: null, need: 30, progress: 1 };
+  if (cases >= 15) return { title: "Inspector", next: "Chief Inspector", need: 30, progress: (cases - 15) / 15 };
+  if (cases >= 5) return { title: "Detective", next: "Inspector", need: 15, progress: (cases - 5) / 10 };
+  if (cases >= 1) return { title: "Junior Detective", next: "Detective", need: 5, progress: cases / 5 };
+  return { title: "Cadet", next: "Junior Detective", need: 1, progress: 0 };
 }
 function getCancelled(): { name: string; amount: number; cycle: string; date: string }[] {
   try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || "[]"); }
@@ -65,6 +65,19 @@ export default function ReportPage() {
         <p className="text-[11px] font-black tracking-[0.16em] text-[var(--brand)] uppercase mb-2">Case Report</p>
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] mb-1">Your subscription cases</h1>
         <p className="text-[13px] text-[var(--text-secondary)]">{rankInfo.title}{rankInfo.next ? ` · next: ${rankInfo.next}` : " · top rank"}</p>
+        {rankInfo.next && (
+          <div className="mt-3 max-w-[240px] mx-auto">
+            <div className="h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[var(--brand)] to-[var(--brand-strong)] transition-all duration-700"
+                style={{ width: `${Math.round(rankInfo.progress * 100)}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1.5">
+              {Math.max(0, rankInfo.need - det.cases)} more case{rankInfo.need - det.cases !== 1 ? 's' : ''} to {rankInfo.next}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 統計卡 */}
