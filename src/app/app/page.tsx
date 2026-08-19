@@ -1628,10 +1628,13 @@ export default function AppPage() {
           animate={{ y: 0, opacity: 1 }}
           className="bg-[var(--text)] text-[var(--bg)] px-6 py-5 animate-slide-down"
         >
-          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] text-[var(--text-on-card-strong)] mb-0.5">Renews tomorrow</p>
-              <p className="text-[17px] font-semibold truncate">{s.name} · {fmtCurrency(s.amount)}</p>
+          <div className="max-w-md mx-auto px-1 py-1">
+            <div className="flex items-baseline justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <p className="text-[12px] text-[var(--text-on-card-strong)] mb-0.5">Renews tomorrow</p>
+                <p className="text-[17px] font-semibold truncate">{s.name}</p>
+              </div>
+              <span className="text-[15px] font-bold text-[var(--text-on-card-strong)] flex-shrink-0">{fmtCurrency(s.amount)}</span>
             </div>
             <button
               onClick={() => {
@@ -1650,7 +1653,7 @@ export default function AppPage() {
                   openProofFlow(s);
                 }
               }}
-              className="flex-shrink-0 bg-[var(--red)] text-[var(--bg)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
+              className="w-full bg-[var(--red)] text-[var(--bg)] text-[14px] font-semibold py-2.5 rounded-full active:scale-95 transition-transform cursor-pointer"
             >
               Cancel now
             </button>
@@ -2348,9 +2351,10 @@ export default function AppPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="w-8 h-1 rounded-full bg-[var(--bg-active)] mx-auto mb-5" />
-                <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-5">New subscription</h3>
+                <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-1">File a report</h3>
+                <p className="text-[13px] text-[var(--text-secondary)] mb-5">Report a service that's charging you</p>
                 <div className="space-y-3">
-                  <input className="input-apple" placeholder="Service name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
+                  <input className="input-apple" placeholder="Name of the suspect" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <span className="absolute left-4 top-[14px] text-[15px] text-[var(--text-tertiary)] font-medium">$</span>
@@ -2378,7 +2382,7 @@ export default function AppPage() {
                   )}
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Cancel</button>
-                    <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount || (form.isTrial && !form.trialEnd)}>Add</button>
+                    <button onClick={addSub} className="btn-primary flex-1" disabled={!form.name || !form.amount || (form.isTrial && !form.trialEnd)}>File report</button>
                   </div>
                 </div>
               </motion.div>

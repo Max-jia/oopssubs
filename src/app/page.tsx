@@ -75,7 +75,7 @@ export default function HomePage() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
-          Every month, forgotten services take money from your account.<br />Time to investigate.
+          Your money is going somewhere. Find out where.
         </motion.p>
 
         {/* 證據牆:已破案案例(橫向滑動) */}
@@ -96,8 +96,18 @@ export default function HomePage() {
               <motion.div
                 key={c.no}
                 initial={{ opacity: 0, y: 16, rotate: i % 2 === 0 ? -5 : 5 }}
-                animate={{ opacity: 1, y: 0, rotate: i % 2 === 0 ? -1.5 : 1.5 }}
-                transition={{ delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 }}
+                animate={{
+                  opacity: 1,
+                  y: [0, -5, 0],
+                  rotate: i % 2 === 0 ? -1.5 : 1.5,
+                  scale: [1, 1.03, 1],
+                }}
+                transition={{
+                  y: { duration: 3.2, repeat: Infinity, delay: 1.2 + i * 0.9, ease: "easeInOut" },
+                  scale: { duration: 3.2, repeat: Infinity, delay: 1.2 + i * 0.9, ease: "easeInOut" },
+                  opacity: { delay: 0.75 + i * 0.1, duration: 0.4 },
+                  rotate: { delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 },
+                }}
                 className="relative card w-[150px] flex-shrink-0 snap-start py-4"
               >
                 <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gradient-to-b from-[var(--text-secondary)] to-[var(--text-tertiary)] shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
