@@ -1637,11 +1637,17 @@ export default function AppPage() {
               onClick={() => {
                 savePendingCancel({ subId: s.id, name: s.name, timestamp: Date.now() });
                 const cancelSlug = cancelSlugFor(s.name);
-                if (isNativeApp()) {
-                  // App 內部伺服器對「乾淨目錄路徑」會回傳首頁 HTML——必須帶 index.html 顯式
-                  window.location.href = cancelSlug ? `/cancel/${cancelSlug}/index.html` : '/cancel/index.html';
+                if (cancelSlug) {
+                  // 有教學頁 → 跳對應教學頁
+                  if (isNativeApp()) {
+                    // App 內部伺服器對「乾淨目錄路徑」會回傳首頁 HTML——必須帶 index.html 顯式
+                    window.location.href = `/cancel/${cancelSlug}/index.html`;
+                  } else {
+                    window.open(`/cancel/${cancelSlug}`, '_blank');
+                  }
                 } else {
-                  window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
+                  // 無教學頁 → 直接進取消證明流程(上傳截圖)
+                  openProofFlow(s);
                 }
               }}
               className="flex-shrink-0 bg-[var(--red)] text-[var(--bg)] text-[14px] font-semibold px-4 py-2 rounded-full active:scale-95 transition-transform cursor-pointer"
