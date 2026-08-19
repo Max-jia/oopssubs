@@ -1638,8 +1638,8 @@ export default function AppPage() {
                 savePendingCancel({ subId: s.id, name: s.name, timestamp: Date.now() });
                 const cancelSlug = cancelSlugFor(s.name);
                 if (isNativeApp()) {
-                  // App WebView 不支援 window.open('_blank'),直接導航
-                  window.location.href = cancelSlug ? `/cancel/${cancelSlug}` : '/cancel';
+                  // App 內部伺服器對「乾淨目錄路徑」會回傳首頁 HTML——必須帶 index.html 顯式
+                  window.location.href = cancelSlug ? `/cancel/${cancelSlug}/index.html` : '/cancel/index.html';
                 } else {
                   window.open(cancelSlug ? `/cancel/${cancelSlug}` : '/cancel', '_blank');
                 }
@@ -1939,7 +1939,7 @@ export default function AppPage() {
                         Keep it
                       </button>
                       <Link
-                        href={trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel"}
+                        href={isNativeApp() ? (trialAlert.slug ? `/cancel/${trialAlert.slug}/index.html` : "/cancel/index.html") : (trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel")}
                         className="bg-[var(--amber)] hover:bg-[#e68f00] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium px-3.5 py-2 rounded-full"
                       >
                         Cancel it

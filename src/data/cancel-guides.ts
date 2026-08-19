@@ -76,6 +76,13 @@ export const cancelGuides: CancelGuide[] = [
     steps: ['Go to disneyplus.com/account', 'Click your subscription', 'Click "Cancel Subscription"', 'Confirm'],
   },
   {
+    slug: 'chatgpt',
+    name: 'ChatGPT',
+    difficulty: 'easy',
+    steps: ['Go to chatgpt.com/settings/billing', 'Click "Manage subscription"', 'Click "Cancel plan"', 'Choose a reason and confirm'],
+    directLink: 'https://chatgpt.com/settings/billing',
+  },
+  {
     slug: 'apple-music',
     name: 'Apple Music',
     difficulty: 'easy',
