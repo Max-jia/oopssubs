@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
 import { initPurchases, checkPro, buyPro, restorePro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
 import { enableRipple } from "@/lib/ripple";
+import { drawShareCard } from "@/lib/share-card";
 import { cancelGuides } from "@/data/cancel-guides";
 import { Browser } from "@capacitor/browser";
 import { App as CapApp } from "@capacitor/app";
@@ -53,7 +54,7 @@ const FREE_LIMIT = 3;
 
 /* 取消證據：AI 審核結果 + 截圖（截圖只存 IndexedDB，localStorage 5MB 放不下） */
 interface ProofRecord {
-  verified: "ai" | "skipped" | "ai-down";
+  verified: "ai";
   reason?: string; // AI 的判定理由（若有）
   at: number;
 }
@@ -1034,6 +1035,8 @@ export default function AppPage() {
   const [buying, setBuying] = useState(false);
   const [buyError, setBuyError] = useState("");
   const [restoring, setRestoring] = useState(false);
+  const [shareImg, setShareImg] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
   // 首次看到列表時,第一行自動演示一次左滑教學
   // 全局錯誤捕獲:崩潰時把具體錯誤顯示在畫面上(用戶可原文回報,協助遠端排查)
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -1080,7 +1083,7 @@ export default function AppPage() {
     verdict: { aiAvailable: boolean; passed: boolean; confidence: string; reason: string } | null;
     aiError: boolean;
     line: string; // 偵探台詞（隨機抽）
-    verified: "ai" | "skipped" | "ai-down" | null;
+    verified: "ai" | null;
     checks: [boolean, boolean, boolean];
     hold: number; // 長按 3 秒進度 0–1
   } | null>(null);
@@ -1448,7 +1451,7 @@ export default function AppPage() {
   const finishProof = useCallback(() => {
     if (!proof) return;
     const { sub } = proof;
-    const verified = proof.verified || "skipped";
+    const verified = proof.verified === "ai" ? "ai" : "ai"; // 必須 AI 審核通過才可取消
     const rec: ProofRecord = {
       verified,
       ...(proof.verdict?.reason ? { reason: proof.verdict.reason } : {}),
@@ -1481,6 +1484,18 @@ export default function AppPage() {
     } catch {
       setError("Could not read that image. Try another screenshot.");
       setTimeout(() => setError(""), 4000);
+    }
+  }, [proof]);
+
+  // AI 故障重試:用同一張截圖重新送審
+  const retryProof = useCallback(async () => {
+    if (!proof?.image) return;
+    setProof(p => (p ? { ...p, stage: "reviewing", verdict: null, aiError: false } : p));
+    try {
+      const verdict = await callVerifyProof(proof.sub, proof.image);
+      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+    } catch {
+      setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
     }
   }, [proof]);
 
@@ -1724,14 +1739,21 @@ export default function AppPage() {
             <p className="text-[12px] text-[var(--text-secondary)] uppercase tracking-[0.05em]">Lifetime saved</p>
             <AnimatedNumber value={lifetimeSavings()} className="text-[28px] font-extrabold tracking-[-0.02em] text-[var(--green)]" />
             <button
-              onClick={() => {
-                const cancelled = getCancelled().slice(-5).map(c => `${c.name} ${fmtCurrency(c.cycle === 'yearly' ? c.amount : c.amount * 12)}/yr`).join(', ');
-                const text = `I found ${fmtCurrency(lifetimeSavings())}/year in forgotten subscriptions using OopsSubs.\nMy cancelled: ${cancelled}\nCheck yours → oopssubs.com`;
-                navigator.clipboard.writeText(text).then(() => alert('Copied! Share anywhere.'));
+              onClick={async () => {
+                if (shareBusy) return;
+                setShareBusy(true);
+                const url = await drawShareCard({
+                  cases: detective.cases,
+                  streak: detective.streak,
+                  recovered: lifetimeSavings(),
+                  closed: getCancelled().map(c => ({ name: c.name, amount: c.amount, cycle: c.cycle })),
+                });
+                setShareBusy(false);
+                if (url) setShareImg(url);
               }}
               className="text-[12px] text-[var(--text-secondary)] underline hover:text-[var(--text)] mt-1"
             >
-              Share your savings
+              {shareBusy ? "Generating…" : "Share your savings"}
             </button>
           </div>
         )}
@@ -2164,9 +2186,10 @@ export default function AppPage() {
                       </div>
                       <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">AI check unavailable</h3>
                       <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-7 max-w-[280px] mx-auto">
-                        We couldn&apos;t reach the AI checker right now. You can still submit your screenshot as proof.
+                        The inspector couldn&apos;t review your evidence right now. Cancellation requires AI verification — please try again in a moment.
                       </p>
-                      <button onClick={() => setProof(p => (p ? { ...p, verified: "ai-down", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
+                      <button onClick={retryProof} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">Retry with this screenshot</button>
+                      <button onClick={() => setProof(p => (p ? { ...p, stage: "select", verdict: null, aiError: false, line: "", image: null } : p))} className="btn-secondary text-[16px] py-4 w-full">Choose another screenshot</button>
                     </div>
                   ) : proof.verdict.passed ? (
                     <div className="pt-6">
@@ -2227,9 +2250,7 @@ export default function AppPage() {
                         )}
                       </div>
                       <button onClick={() => setProof(p => (p ? { ...p, stage: "select", verdict: null, aiError: false, line: "", image: null } : p))} className="btn-secondary text-[16px] py-4 w-full mb-3">Choose another screenshot</button>
-                      <button onClick={() => setProof(p => (p ? { ...p, verified: "skipped", stage: "confirm" } : p))} className="block mx-auto text-[13px] text-[var(--text-secondary)] underline hover:text-[var(--text)] transition-colors">
-                        I did cancel it — skip AI check
-                      </button>
+                      <p className="text-[12px] text-[var(--text-tertiary)] text-center">Cancellation requires approved evidence. Take a clearer screenshot of the cancellation page.</p>
                     </div>
                   )
                 )}
@@ -2277,7 +2298,7 @@ export default function AppPage() {
                       />
                     </button>
                     <p className="text-[12px] text-[var(--text-tertiary)] mt-4 text-center">
-                      {proof.verified === "skipped" ? "AI check skipped at your request." : "This is a binding confirmation of your cancellation."}
+                      "This is a binding confirmation of your cancellation."
                     </p>
                   </div>
                 )}
@@ -2325,6 +2346,49 @@ export default function AppPage() {
                 <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 分享卡預覽 */}
+        <AnimatePresence>
+          {shareImg && (
+            <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+              <motion.div
+                className="w-full max-w-sm"
+                initial={{ scale: 0.85, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.85, opacity: 0 }}
+              >
+                <img src={shareImg} alt="Your detective case report" className="w-full rounded-2xl shadow-2xl" />
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const blob = await (await fetch(shareImg)).blob();
+                        const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
+                        if (navigator.share) {
+                          await navigator.share({ files: [file], title: "OopsSubs case report" });
+                        } else {
+                          alert("Long-press the image to save it, then share anywhere.");
+                        }
+                      } catch { /* 用戶取消分享 */ }
+                    }}
+                    className="btn-gold flex-1 text-[14px] font-semibold py-3"
+                  >
+                    Share
+                  </button>
+                  <button
+                    onClick={() => setShareImg(null)}
+                    className="btn-secondary flex-1 text-[14px] font-semibold py-3"
+                  >
+                    Close
+                  </button>
+                </div>
+                <p className="text-[11px] text-[var(--text-tertiary)] text-center mt-3">
+                  Tip: long-press the image to save it
+                </p>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
