@@ -238,13 +238,13 @@ export async function drawFileCard(data: ShareData): Promise<string> {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
 
-  // 金色標籤(CONFIDENTIAL)
-  ctx.fillStyle = "#FFB340";
+  // 標籤(CONFIDENTIAL)——深棕底,與全站風格統一(不用金)
+  ctx.fillStyle = "#3E2F1C";
   ctx.beginPath();
   ctx.moveTo(W / 2 - 210, 0); ctx.lineTo(W / 2 + 210, 0);
   ctx.lineTo(W / 2 + 210, 96); ctx.lineTo(W / 2 - 210, 96);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#2B2116";
+  ctx.fillStyle = "#E8D5B5";
   ctx.textAlign = "center";
   ctx.font = "900 30px -apple-system, sans-serif";
   ctx.letterSpacing = "8px";
@@ -277,16 +277,13 @@ export async function drawFileCard(data: ShareData): Promise<string> {
     ctx.font = "800 22px -apple-system, sans-serif";
     ctx.letterSpacing = "4px";
     ctx.fillText(label.toUpperCase(), 140, y);
-    ctx.fillStyle = gold ? "#8B5E1F" : "#2B2116";
+    ctx.fillStyle = gold ? "#7A4E12" : "#2B2116";
     ctx.font = "800 42px -apple-system, sans-serif";
     ctx.letterSpacing = "0px";
     ctx.fillText(value, 140, y + 52);
   };
   field("Subject", "Your forgotten subscriptions", 440);
-  field("Status", `${data.cases} CASES CLOSED`, 550);
-  ctx.fillStyle = "#8B5E1F";
-  ctx.font = "700 34px -apple-system, sans-serif";
-  ctx.fillText(`${rankTitle(data.cases)}`, 140, 602);
+  field("Status", `${data.cases} CASES CLOSED · ${rankTitle(data.cases)}`, 550);
   field("Recovered", `${fmt(total)} / YEAR`, 680, true);
 
   // 破案清單
