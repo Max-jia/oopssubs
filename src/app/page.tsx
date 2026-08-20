@@ -20,11 +20,28 @@ const iconPaths = {
   sparkles: <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />,
 };
 
+const CANCELLED_KEY = "oopssubs_cancelled";
+const DETECTIVE_KEY = "oopssubs_detective";
+function getClosedCases(): { name: string; amount: number; cycle: string; date: string }[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || "[]"); }
+  catch { return []; }
+}
+function getDetectiveCases(): number {
+  if (typeof window === "undefined") return 0;
+  try { return JSON.parse(localStorage.getItem(DETECTIVE_KEY) || "{}").cases || 0; }
+  catch { return 0; }
+}
+
 export default function HomePage() {
   // App 偵測要等 Capacitor bridge 注入才可靠，先預設網頁版，載入後立即重算
   const [isNative, setIsNative] = useState(false);
+  const [closedCases, setClosedCases] = useState<{ name: string; amount: number; cycle: string; date: string }[]>([]);
+  const [detectiveCases, setDetectiveCases] = useState(0);
   useEffect(() => { enableRipple();
     setIsNative(isNativeApp());
+    setClosedCases(getClosedCases().slice(-5).reverse());
+    setDetectiveCases(getDetectiveCases());
   }, []);
   return (
     <main className="min-h-screen notebook-grid animate-fade-in overflow-x-hidden">
@@ -89,30 +106,46 @@ export default function HomePage() {
           <div className="relative">
             <span className="evidence-sweep" />
             <div className="flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x">
-            {[
-              { no: 7, name: 'Netflix', rec: '$367' },
-              { no: 12, name: 'Hulu', rec: '$95' },
-              { no: 23, name: 'Spotify', rec: '$131' },
-              { no: 31, name: 'Adobe CC', rec: '$599' },
-            ].map((c, i) => (
+            {closedCases.length > 0 ? closedCases.map((c, i) => {
+              const annual = c.cycle === 'yearly' ? c.amount : c.amount * 12;
+              const caseNo = detectiveCases - i;
+              return (
               <motion.div
-                key={c.no}
+                key={caseNo}
                 initial={{ opacity: 0, y: 16, rotate: i % 2 === 0 ? -5 : 5 }}
                 animate={{ opacity: 1, y: 0, rotate: i % 2 === 0 ? -1.5 : 1.5 }}
                 transition={{ delay: 0.75 + i * 0.1, type: "spring", stiffness: 350, damping: 20 }}
                 className="relative card w-[150px] flex-shrink-0 snap-start py-4"
               >
                 <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gradient-to-b from-[var(--text-secondary)] to-[var(--text-tertiary)] shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
-                <p className="text-[9px] font-black tracking-[0.12em] text-[var(--text-tertiary)] mb-1">CASE #{c.no}</p>
+                <p className="text-[9px] font-black tracking-[0.12em] text-[var(--text-tertiary)] mb-1">CASE #{caseNo}</p>
                 <p className="text-[14px] font-semibold truncate">{c.name}</p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-[11px] text-[var(--green)] font-semibold">{c.rec} recovered</span>
+                  <span className="text-[11px] text-[var(--green)] font-semibold">${Math.round(annual)} recovered</span>
                   <span className="stamp-pulse text-[9px] font-black tracking-[0.1em] text-[var(--green)] border border-[var(--green)] rounded px-1.5 py-0.5 rotate-[-8deg]">
                     CLOSED
                   </span>
                 </div>
               </motion.div>
-            ))}
+              );
+            }) : (
+              /* 新用戶:空檔案牆 */
+              <div className="card text-center py-10 px-6">
+                <svg className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                </svg>
+                <p className="text-[13px] font-black tracking-[0.16em] text-[var(--text-tertiary)] uppercase mb-1.5">Case file: empty</p>
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4 max-w-[240px] mx-auto">
+                  Your first case is waiting. Find a forgotten subscription and close it.
+                </p>
+                <Link
+                  href={appHref("manual", isNative)}
+                  className="inline-block text-[13px] font-semibold text-[var(--brand)] hover:text-[var(--brand-strong)] transition-colors"
+                >
+                  Open your first case →
+                </Link>
+              </div>
+            )}
             </div>
           </div>
         </motion.div>
