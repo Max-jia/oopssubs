@@ -162,13 +162,40 @@ export async function drawShareCard(data: ShareData): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
+// 分享卡先寫入暫存檔,返回 file:// URI(原生外掛對 data URI 不穩)
+async function persistShareImage(dataUrl: string): Promise<string | null> {
+  try {
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const base64 = dataUrl.split(",")[1];
+    const name = `share-${Date.now()}.png`;
+    await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache });
+    const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+    return uri;
+  } catch {
+    return null;
+  }
+}
+
 // 保存分享卡到相簿(App 內用 Media 外掛;網站版用 download)
 export async function saveShareToPhotos(dataUrl: string): Promise<{ ok: boolean; error?: string }> {
   try {
+    const uri = await persistShareImage(dataUrl);
+    if (!uri) return { ok: false, error: "temp file failed" };
     const { Media } = await import("@capacitor-community/media");
-    await Media.savePhoto({ path: dataUrl });
+    await Media.savePhoto({ path: uri });
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: String(e?.code || e?.message || e).slice(0, 60) };
+    return { ok: false, error: String(e?.message || e?.code || e).slice(0, 60) };
+  }
+}
+
+// App 內原生分享(寫暫存檔後分享文件)
+export async function shareCardNative(dataUrl: string): Promise<void> {
+  const uri = await persistShareImage(dataUrl);
+  const { Share } = await import("@capacitor/share");
+  if (uri) {
+    await Share.share({ title: "OopsSubs case report", files: [uri], dialogTitle: "Share your case report" });
+  } else {
+    await Share.share({ title: "OopsSubs case report", url: dataUrl, dialogTitle: "Share your case report" });
   }
 }

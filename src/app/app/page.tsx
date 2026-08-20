@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
 import { initPurchases, checkPro, buyPro, restorePro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
 import { enableRipple } from "@/lib/ripple";
-import { drawShareCard, saveShareToPhotos } from "@/lib/share-card";
+import { drawShareCard, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
 import { cancelGuides } from "@/data/cancel-guides";
 import { Browser } from "@capacitor/browser";
 import { App as CapApp } from "@capacitor/app";
@@ -2392,13 +2392,8 @@ export default function AppPage() {
                     onClick={async () => {
                       try {
                         if (isNativeApp()) {
-                          // App 內:原生分享面板(支援圖片檔案)
-                          const { Share } = await import("@capacitor/share");
-                          await Share.share({
-                            title: "OopsSubs case report",
-                            url: shareImg,
-                            dialogTitle: "Share your case report",
-                          });
+                          // App 內:原生分享面板(先寫暫存檔)
+                          await shareCardNative(shareImg);
                         } else {
                           // 網站版:Web Share API(帶圖片檔案)
                           const blob = await (await fetch(shareImg)).blob();
