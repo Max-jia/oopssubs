@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { drawShareCard, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
 
 // 偵探數據(與 app 頁共用邏輯)
 const DETECTIVE_KEY = "oopssubs_detective";
@@ -28,6 +30,9 @@ export default function ReportPage() {
   const [det, setDet] = useState({ cases: 0, streak: 0 });
   const [cases, setCases] = useState<{ name: string; amount: number; cycle: string; date: string }[]>([]);
   const [copied, setCopied] = useState(false);
+  const [shareImg, setShareImg] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareSaved, setShareSaved] = useState<string | null>(null);
 
   useEffect(() => {
     setDet(getDetective());
@@ -46,11 +51,16 @@ export default function ReportPage() {
     `Check yours → oopssubs.com`;
 
   const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(shareText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* noop */ }
+    if (shareBusy) return;
+    setShareBusy(true);
+    const url = await drawShareCard({
+      cases: det.cases,
+      streak: det.streak,
+      recovered: totalRecovered,
+      closed: cases.map(c => ({ name: c.name, amount: c.amount, cycle: c.cycle })),
+    });
+    setShareBusy(false);
+    if (url) setShareImg(url);
   };
 
   return (
@@ -127,9 +137,60 @@ export default function ReportPage() {
         onClick={handleShare}
         className="btn-primary w-full mb-3"
       >
-        {copied ? "Copied! Share anywhere ✓" : "Share case report"}
+        {shareBusy ? "Generating…" : "Share case report"}
       </button>
       <p className="text-[12px] text-[var(--text-tertiary)] text-center">Share your report — friends will check their own subscriptions</p>
+
+      {/* 分享卡預覽 */}
+      <AnimatePresence>
+        {shareImg && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              className="w-full max-w-sm"
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+            >
+              <img src={shareImg} alt="Your detective case report" className="w-full rounded-2xl shadow-2xl" />
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={async () => {
+                    const res = await saveShareToPhotos(shareImg);
+                    setShareSaved(res.ok ? "Saved to Photos ✓" : `Save failed: ${res.error || "unknown"}`);
+                    setTimeout(() => setShareSaved(null), 3500);
+                  }}
+                  className="btn-gold flex-1 text-[13px] font-semibold py-3"
+                >
+                  Save to Photos
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      if ((window as any).Capacitor) {
+                        await shareCardNative(shareImg);
+                      } else {
+                        const blob = await (await fetch(shareImg)).blob();
+                        const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
+                        if (navigator.share) await navigator.share({ files: [file], title: "OopsSubs case report" });
+                      }
+                    } catch { /* 用戶取消 */ }
+                  }}
+                  className="btn-secondary flex-1 text-[13px] font-semibold py-3"
+                >
+                  Share
+                </button>
+                <button
+                  onClick={() => setShareImg(null)}
+                  className="btn-secondary flex-1 text-[13px] font-semibold py-3"
+                >
+                  Close
+                </button>
+              </div>
+              {shareSaved && <p className="text-[12px] text-[var(--green)] text-center mt-3">{shareSaved}</p>}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
