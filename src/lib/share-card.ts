@@ -182,7 +182,19 @@ export async function saveShareToPhotos(dataUrl: string): Promise<{ ok: boolean;
     const uri = await persistShareImage(dataUrl);
     if (!uri) return { ok: false, error: "temp file failed" };
     const { Media } = await import("@capacitor-community/media");
-    await Media.savePhoto({ path: uri });
+    // Android 需要 albumIdentifier——確保 OopsSubs 相簿存在
+    const albums = (await Media.getAlbums()).albums;
+    let album = albums.find((a) => a.name === "OopsSubs");
+    if (!album) {
+      await Media.createAlbum({ name: "OopsSubs" });
+      const after = (await Media.getAlbums()).albums;
+      album = after.find((a) => a.name === "OopsSubs");
+    }
+    if (album) {
+      await Media.savePhoto({ path: uri, albumIdentifier: album.identifier });
+    } else {
+      await Media.savePhoto({ path: uri });
+    }
     return { ok: true };
   } catch (e: any) {
     return { ok: false, error: String(e?.message || e?.code || e).slice(0, 60) };
