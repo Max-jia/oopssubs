@@ -40,9 +40,9 @@ export default async function handler(req, res) {
   } catch {
     return res.status(400).json({ error: "bad json" });
   }
-  const { name, amount, cycle, imageBase64, mimeType } = body;
-  if (!name || !imageBase64) return res.status(400).json({ error: "missing fields" });
-  if (imageBase64.length > MAX_IMAGE_BYTES) return res.status(413).json({ error: "image too large" });
+  const { name, amount, cycle, imageBase64, audioBase64, mimeType } = body;
+  if (!name || (!imageBase64 && !audioBase64)) return res.status(400).json({ error: "missing fields" });
+  if ((imageBase64 || audioBase64).length > MAX_IMAGE_BYTES) return res.status(413).json({ error: "media too large" });
 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(503).json({ aiAvailable: false, error: "ai not configured" });
@@ -71,6 +71,47 @@ export default async function handler(req, res) {
     `${PASS_FEATURES}\n` +
     `Reply with JSON only, no markdown: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
+  // 偵探評語池(通過/拒絕,風格混合:法庭/審訊/幽默/偵探)
+  const PASS_LINES = [
+    "The witness's voice is steady. Credible. Case closed.",
+    "Confession accepted. The court is satisfied.",
+    "Crystal clear testimony. Case closed.",
+    "The witness speaks true. Evidence recorded.",
+    "Steady voice, clear words. This testimony holds up.",
+    "The truth, the whole truth. Case closed.",
+    "Nothing but the truth — and we heard it all. Case closed.",
+    "The detective nods. Testimony accepted.",
+    "Clean statement. No hesitation. Accepted.",
+    "The witness has convinced the court. Case closed.",
+  ];
+  const FAIL_LINES = [
+    "I detect hesitation... The court is not convinced.",
+    "This testimony doesn't hold up. Try again.",
+    "The witness mumbles. Evidence insufficient.",
+    "Too vague. We need to hear the service name clearly.",
+    "I hear words, but not a clear cancellation. Rejected.",
+    "The court finds this testimony unreliable. Try again.",
+    "Hmm... the witness seems unsure. Rejected.",
+    "That's not a confession. That's a whisper. Try again.",
+    "The detective frowns. Not good enough.",
+    "Evidence doesn't match the claim. Rejected.",
+  ];
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  const audioPromptA =
+    `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
+    (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
+    `. Listen to the audio and transcribe it.\n` +
+    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — e.g. "I cancelled ${name}", "I ended my ${name} subscription", "${name} is cancelled". The service name (or an unmistakable reference to it) and a cancellation statement must both be present.\n` +
+    `FAIL if: the service name is missing or unclear; there is no clear cancellation statement; the speech is too unclear/too short to understand; or the person seems to be reading something unrelated.\n` +
+    `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
+
+  const audioPromptB =
+    `You are an adversarial second reviewer for the same claim: the user recorded "${name}" cancellation testimony. Be skeptical.\n` +
+    `Find ANY reason the testimony is unreliable: unclear speech, missing service name, no explicit cancellation statement, too short, background noise making it unintelligible, or sounding scripted/coached in a way that obscures the actual claim. If unsure, FAIL.\n` +
+    `PASS only if the service name and a clear cancellation statement are both clearly audible.\n` +
+    `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
+
   const callGemini = async (prompt) => {
     const gemRes = await fetch(GEMINI_URL, {
       method: "POST",
@@ -83,7 +124,9 @@ export default async function handler(req, res) {
         model: "gemini-3.5-flash",
         input: [
           { type: "text", text: prompt },
-          { type: "image", data: imageBase64, mime_type: mimeType || "image/jpeg" },
+          ...(audioBase64
+            ? [{ type: "audio", data: audioBase64, mime_type: mimeType || "audio/webm" }]
+            : [{ type: "image", data: imageBase64, mime_type: mimeType || "image/jpeg" }]),
         ],
       }),
     });
@@ -102,15 +145,17 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 雙重審核:兩次獨立調用,任一失敗/不通過 → 拒絕
-    const [verdictA, verdictB] = await Promise.all([callGemini(promptA), callGemini(promptB)]);
+    // 雙重審核:兩次獨立調用,任一失敗/不通過 → 拒絕(音頻用宣誓證詞提示詞)
+    const [verdictA, verdictB] = await Promise.all(
+      audioBase64 ? [callGemini(audioPromptA), callGemini(audioPromptB)] : [callGemini(promptA), callGemini(promptB)]
+    );
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
     }
     const passed = verdictA.passed && verdictB.passed;
     const reason = passed
-      ? verdictA.reason
-      : `Second opinion: ${verdictB.reason}${verdictA.reason ? " | " + verdictA.reason : ""}`;
+      ? pick(PASS_LINES)
+      : pick(FAIL_LINES);
     return res.json({
       aiAvailable: true,
       passed,
@@ -118,6 +163,7 @@ export default async function handler(req, res) {
         ? (verdictA.confidence === "high" && verdictB.confidence === "high" ? "high" : "medium")
         : "low",
       reason,
+      ...(audioBase64 && verdictA.transcript ? { transcript: verdictA.transcript } : {}),
     });
   } catch (e) {
     console.error("verify-proof error:", e.message);

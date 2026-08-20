@@ -238,14 +238,25 @@ function DebtCard({ p, onOpen }: { p: PendingProof; onOpen: () => void }) {
 
 /* 送截圖給網站後台 → Gemini 審核。後台只在網站伺服器上有鑰匙，App 拿不到。
    App 內部伺服器沒有 /api，必須呼叫線上網站；網站版同源用相對路徑。 */
-async function callVerifyProof(sub: Subscription, dataUrl: string): Promise<{ aiAvailable: boolean; passed: boolean; confidence: string; reason: string }> {
+async function callVerifyProof(sub: Subscription, dataUrl: string, isAudio = false): Promise<{ aiAvailable: boolean; passed: boolean; confidence: string; reason: string; transcript?: string }> {
   const comma = dataUrl.indexOf(",");
-  const mimeType = dataUrl.slice(5, comma).includes("png") ? "image/png" : "image/jpeg";
+  const header = dataUrl.slice(5, comma);
   const base = isNativeApp() ? "https://oopssubs.com" : "";
+  const body = isAudio
+    ? {
+        name: sub.name, amount: fmtCurrency(sub.amount), cycle: sub.cycle,
+        audioBase64: dataUrl.slice(comma + 1),
+        mimeType: header.includes("mp4") ? "audio/mp4" : header.includes("wav") ? "audio/wav" : "audio/webm",
+      }
+    : {
+        name: sub.name, amount: fmtCurrency(sub.amount), cycle: sub.cycle,
+        imageBase64: dataUrl.slice(comma + 1),
+        mimeType: header.includes("png") ? "image/png" : "image/jpeg",
+      };
   const res = await fetch(`${base}/api/verify-proof/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: sub.name, amount: fmtCurrency(sub.amount), cycle: sub.cycle, imageBase64: dataUrl.slice(comma + 1), mimeType }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("AI unavailable");
   return res.json();
@@ -1079,9 +1090,11 @@ export default function AppPage() {
   // 取消證據流程（取消證明制：沒交截圖證明，取消提醒會一直持續）
   const [proof, setProof] = useState<{
     sub: Subscription;
-    stage: "select" | "reviewing" | "result" | "confirm" | "done";
+    stage: "select" | "audio" | "reviewing" | "result" | "confirm" | "done";
     image: string | null;
-    verdict: { aiAvailable: boolean; passed: boolean; confidence: string; reason: string } | null;
+    audio: string | null;
+    isAudio: boolean;
+    verdict: { aiAvailable: boolean; passed: boolean; confidence: string; reason: string; transcript?: string } | null;
     aiError: boolean;
     line: string; // 偵探台詞（隨機抽）
     verified: "ai" | null;
@@ -1433,7 +1446,7 @@ export default function AppPage() {
 
   /* ── 取消證據流程 ── */
   const openProofFlow = useCallback((sub: Subscription) => {
-    setProof({ sub, stage: "select", image: null, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0 });
+    setProof({ sub, stage: "select", image: null, audio: null, isAudio: false, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0 });
   }, []);
 
   // 關閉證據流程：沒完成 = 列入追債清單（保留首次開始時間，天數才不會被重開重置）
@@ -1485,6 +1498,55 @@ export default function AppPage() {
     } catch {
       setError("Could not read that image. Try another screenshot.");
       setTimeout(() => setError(""), 4000);
+    }
+  }, [proof]);
+
+  // ── 語音作證:錄音 ──
+  const [recording, setRecording] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAudioUrl(reader.result as string);
+          setProof(p => (p ? { ...p, audio: reader.result as string, isAudio: true } : p));
+        };
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach((t) => t.stop());
+      };
+      rec.start();
+      recorderRef.current = rec;
+      setRecording(true);
+    } catch {
+      setError("Microphone unavailable. Try the screenshot option instead.");
+      setTimeout(() => setError(""), 4000);
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    setRecording(false);
+  }, []);
+
+  // 提交語音證詞 → 審核
+  const submitAudio = useCallback(async () => {
+    if (!proof?.audio) return;
+    setProof(p => (p ? { ...p, stage: "reviewing", verdict: null, aiError: false } : p));
+    try {
+      const verdict = await callVerifyProof(proof.sub, proof.audio, true);
+      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+    } catch {
+      setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
     }
   }, [proof]);
 
@@ -2142,11 +2204,20 @@ export default function AppPage() {
                         <p className="text-[13px] mt-2">No screenshot yet</p>
                       </div>
                     )}
-                    <button onClick={() => fileInputRef.current?.click()} className="btn-primary text-[16px] font-semibold py-4 w-full">
+                    <button onClick={() => fileInputRef.current?.click()} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                       </svg>
                       Choose screenshot
+                    </button>
+                    <button
+                      onClick={() => setProof(p => (p ? { ...p, stage: "audio" } : p))}
+                      className="btn-secondary text-[16px] py-4 w-full"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                      </svg>
+                      Record testimony
                     </button>
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProofFile} />
                     <p className="text-[12px] text-[var(--text-tertiary)] mt-5 leading-relaxed max-w-xs mx-auto">
@@ -2155,10 +2226,78 @@ export default function AppPage() {
                   </div>
                 )}
 
+                {proof.stage === "audio" && (
+                  <div className="text-center pt-6">
+                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                      <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Give your testimony</h3>
+                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-6 max-w-[300px] mx-auto">
+                      Tell the court, in your own words, that you have cancelled <strong className="text-[var(--text)]">{proof.sub.name}</strong>. Speak clearly. The AI will judge your words.
+                    </p>
+                    {audioUrl ? (
+                      <div className="card p-4 mb-6">
+                        <p className="text-[12px] text-[var(--green)] font-semibold mb-2">✓ Testimony recorded</p>
+                        <audio src={audioUrl} controls className="w-full" />
+                      </div>
+                    ) : (
+                      <div className={`h-32 rounded-2xl border-2 border-dashed ${recording ? 'border-[var(--red)]' : 'border-[var(--border)]'} flex flex-col items-center justify-center mb-6 bg-[var(--bg-elevated)]`}>
+                        {recording ? (
+                          <div className="text-center">
+                            <div className="flex items-center justify-center gap-1.5 mb-3">
+                              <div className="w-2 h-2 rounded-full bg-[var(--red)] dot-pulse" />
+                              <div className="w-2 h-2 rounded-full bg-[var(--red)] dot-pulse" />
+                              <div className="w-2 h-2 rounded-full bg-[var(--red)] dot-pulse" />
+                            </div>
+                            <p className="text-[13px] text-[var(--red)] font-semibold">Recording… speak now</p>
+                          </div>
+                        ) : (
+                          <p className="text-[13px] text-[var(--text-tertiary)]">No testimony recorded yet</p>
+                        )}
+                      </div>
+                    )}
+                    {!recording ? (
+                      audioUrl ? (
+                        <button onClick={submitAudio} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
+                          Submit testimony
+                        </button>
+                      ) : (
+                        <button onClick={startRecording} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
+                          <span className="w-3 h-3 rounded-full bg-[var(--red)] inline-block mr-2" />
+                          Start recording
+                        </button>
+                      )
+                    ) : (
+                      <button onClick={stopRecording} className="btn-secondary text-[16px] py-4 w-full mb-3">
+                        Stop recording
+                      </button>
+                    )}
+                    <button onClick={() => setProof(p => (p ? { ...p, stage: "select" } : p))} className="text-[13px] text-[var(--text-secondary)] underline">
+                      Back to options
+                    </button>
+                  </div>
+                )}
+
                 {proof.stage === "reviewing" && (
                   <div className="pt-8">
-                    {/* 偵探放大鏡掃描截圖 */}
+                    {/* 偵探放大鏡掃描截圖 / 法庭聆聽 */}
                     <div className="relative mx-auto mb-8 w-full max-w-[280px] aspect-[4/3] rounded-2xl bg-[var(--bg-elevated)] overflow-hidden">
+                      {proof.isAudio ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center">
+                          <svg className="w-14 h-14 text-[var(--amber)] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                          </svg>
+                          <p className="text-[15px] font-semibold text-[var(--text)]">The court is listening…</p>
+                          <div className="flex items-center justify-center gap-1.5 mt-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--amber)] dot-pulse" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--amber)] dot-pulse" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--amber)] dot-pulse" />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
                       {proof.image && <img src={proof.image} alt="Evidence" className="w-full h-full object-contain" />}
                       <motion.div
                         className="absolute"
@@ -2174,6 +2313,8 @@ export default function AppPage() {
                         {/* 鏡柄 */}
                         <div className="w-1.5 h-10 bg-[var(--text)] rounded-full" style={{ transform: "rotate(45deg)", transformOrigin: "top left" }} />
                       </motion.div>
+                    </>
+                      )}
                     </div>
                     <div className="text-center">
                       <p className="text-[16px] font-semibold text-[var(--text)] mb-1">Inspector is examining your evidence…</p>
@@ -2221,6 +2362,12 @@ export default function AppPage() {
                       <div className="text-center">
                         <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Case closed</h3>
                         <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
+                        {proof.isAudio && proof.verdict.transcript && (
+                          <div className="card p-3 mb-3 text-left">
+                            <p className="text-[10px] font-black tracking-[0.12em] text-[var(--text-tertiary)] uppercase mb-1">Transcript</p>
+                            <p className="text-[13px] text-[var(--text)] italic">"{proof.verdict.transcript}"</p>
+                          </div>
+                        )}
                         {proof.verdict.reason && (
                           <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
