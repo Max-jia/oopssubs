@@ -80,11 +80,12 @@ export default function HomePage() {
             whileTap={{ scale: 0.9 }}
           />
         </motion.div>
+        <div className="relative mb-3 h-[72px]">
         <motion.div
-          className="relative inline-block mb-3"
+          className="relative inline-block"
           initial={{ y: 16 }}
           animate={{ y: 0 }}
-          transition={{ delay: 1.2, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
         >
           <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-left">
             {taglineDone ? (
@@ -104,7 +105,9 @@ export default function HomePage() {
             )}
           </h1>
         </motion.div>
+        </div>
         {/* 副標題:大標題打完後,手電筒逐字照亮 → 停頓 → 金色命令式落款 */}
+        <div className="h-[76px]">
         {taglineDone && (
           <motion.p
             className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
@@ -133,8 +136,10 @@ export default function HomePage() {
             </motion.span>
           </motion.p>
         )}
+        </div>
 
         {/* 證據牆:已破案案例(橫向滑動) */}
+        <div className="h-[215px]">
         {subtitleDone && (
         <motion.div
           className="mb-8 text-left"
@@ -190,6 +195,7 @@ export default function HomePage() {
           </div>
         </motion.div>
         )}
+        </div>
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
             href={appHref("manual", isNative)}
