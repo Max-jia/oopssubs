@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { isNativeApp } from "@/lib/purchases";
 import { enableRipple } from "@/lib/ripple";
+import { Typewriter } from "@/lib/typewriter";
 
 // Native app shell needs the file URL (its local server can't resolve clean routes);
 // the website uses the clean route.
@@ -38,6 +39,7 @@ export default function HomePage() {
   const [isNative, setIsNative] = useState(false);
   const [closedCases, setClosedCases] = useState<{ name: string; amount: number; cycle: string; date: string }[]>([]);
   const [detectiveCases, setDetectiveCases] = useState(0);
+  const [taglineDone, setTaglineDone] = useState(false);
   useEffect(() => { enableRipple();
     setIsNative(isNativeApp());
     setClosedCases(getClosedCases().slice(-5).reverse());
@@ -79,11 +81,25 @@ export default function HomePage() {
           className="relative inline-block mb-3"
           initial={{ y: 16 }}
           animate={{ y: 0 }}
-          transition={{ delay: 0.35, duration: 0.5 }}
+          transition={{ delay: 1.2, duration: 0.5 }}
         >
-          <span className="sweep-light" />
-          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2]">
-            Some subscriptions are<br /><span className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">hiding from you.</span>
+          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-left">
+            {taglineDone ? (
+              <>
+                Some subscriptions are<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)]">hiding from you.</span>
+                <span className="sweep-light" />
+              </>
+            ) : (
+              <Typewriter
+                text="Some subscriptions are
+hiding from you."
+                speed={78}
+                startDelay={1500}
+                onComplete={() => setTaglineDone(true)}
+                className="text-[var(--text)]"
+              />
+            )}
           </h1>
         </motion.div>
         <motion.p

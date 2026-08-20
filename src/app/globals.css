@@ -303,6 +303,16 @@
 }
 .stamp-fade { animation: stampFade 0.4s ease-out forwards; }
 
+/* ── 打字機游標 ── */
+.type-cursor {
+  color: var(--brand);
+  animation: cursorBlink 0.8s step-end infinite;
+  font-weight: 700;
+}
+@keyframes cursorBlink {
+  50% { opacity: 0; }
+}
+
 /* ── 標語金色掃光 ── */
 @keyframes sweepLight {
   0% { transform: translateX(-120%); }
