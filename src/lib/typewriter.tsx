@@ -27,15 +27,14 @@ export function typeClick() {
   } catch { /* 音效失敗不影響打字 */ }
 }
 
-// 打字機組件:text 含 \n 會換行;完成時 onComplete + 金色 class 切換
-export function Typewriter({ text, speed = 70, startDelay = 0, sound = true, onComplete, className, doneClassName }: {
-  text: string;
-  speed?: number;
+// 詞組嗒嗒打字機:逐詞敲出(每詞一聲機械嗒),比逐字快數倍
+export function Typewriter({ words, wordSpeed = 140, startDelay = 0, sound = true, onComplete, className }: {
+  words: string[];
+  wordSpeed?: number;
   startDelay?: number;
   sound?: boolean;
   onComplete?: () => void;
   className?: string;
-  doneClassName?: string;
 }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
@@ -43,7 +42,7 @@ export function Typewriter({ text, speed = 70, startDelay = 0, sound = true, onC
   useEffect(() => {
     setCount(0);
     setDone(false);
-    if (!text) return;
+    if (!words.length) return;
     let i = 0;
     let timer: ReturnType<typeof setInterval> | null = null;
     const startTimer = setTimeout(() => {
@@ -51,27 +50,21 @@ export function Typewriter({ text, speed = 70, startDelay = 0, sound = true, onC
         i++;
         setCount(i);
         if (sound) typeClick();
-        if (i >= text.length) {
+        if (i >= words.length) {
           if (timer) clearInterval(timer);
           setDone(true);
           onComplete?.();
         }
-      }, speed);
+      }, wordSpeed);
     }, startDelay);
     return () => { clearTimeout(startTimer); if (timer) clearInterval(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text]);
+  }, [words.join("|")]);
 
-  const shown = text.slice(0, count);
-  const finalClass = done && doneClassName ? doneClassName : className;
+  const shown = words.slice(0, count).join(" ");
   return (
-    <span className={finalClass}>
-      {shown.split("\n").map((line, i) => (
-        <span key={i}>
-          {line}
-          {i < shown.split("\n").length - 1 && <br />}
-        </span>
-      ))}
+    <span className={className}>
+      {shown}
       {/* 打字游標:未完成時顯示 */}
       {!done && <span className="type-cursor">|</span>}
     </span>

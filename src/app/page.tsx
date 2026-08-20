@@ -95,10 +95,9 @@ export default function HomePage() {
               </>
             ) : (
               <Typewriter
-                text="Some subscriptions are
-hiding from you."
-                speed={78}
-                startDelay={500}
+                words={["Some", "subscriptions", "are", "hiding", "from", "you."]}
+                wordSpeed={130}
+                startDelay={300}
                 onComplete={() => setTaglineDone(true)}
                 className="text-[var(--text)]"
               />
@@ -112,7 +111,7 @@ hiding from you."
             initial="hidden"
             animate="show"
             onAnimationComplete={() => setSubtitleDone(true)}
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.7 } } }}
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.02, delayChildren: 0.4 } } }}
           >
             {"Your money is going somewhere… ".split("").map((ch, i) => (
               <motion.span
@@ -126,7 +125,7 @@ hiding from you."
             <motion.span
               variants={{
                 hidden: { opacity: 0 },
-                show: { opacity: 1, transition: { delay: 2.2, duration: 0.5 } },
+                show: { opacity: 1, transition: { delay: 0.9, duration: 0.4 } },
               }}
               className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)] font-semibold"
             >
