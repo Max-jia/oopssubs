@@ -102,18 +102,18 @@ hiding from you."
             )}
           </h1>
         </motion.div>
-        {/* 副標題:大標題打完後,逐字浮現 → 停頓 → 金色揭曉 */}
+        {/* 副標題:大標題打完後,手電筒逐字照亮 → 停頓 → 金色命令式落款 */}
         {taglineDone && (
           <motion.p
             className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
             initial="hidden"
             animate="show"
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.035, delayChildren: 0.6 } } }}
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.7 } } }}
           >
-            {"Your money is going somewhere. ".split("").map((ch, i) => (
+            {"Your money is going somewhere… ".split("").map((ch, i) => (
               <motion.span
                 key={i}
-                variants={{ hidden: { opacity: 0, y: 5 }, show: { opacity: 1, y: 0 } }}
+                variants={{ hidden: { opacity: 0.16 }, show: { opacity: 1 } }}
                 className="inline-block"
               >
                 {ch === " " ? " " : ch}
@@ -121,12 +121,12 @@ hiding from you."
             ))}
             <motion.span
               variants={{
-                hidden: { opacity: 0, y: 6 },
-                show: { opacity: 1, y: 0, transition: { delay: 1.9, duration: 0.5 } },
+                hidden: { opacity: 0 },
+                show: { opacity: 1, transition: { delay: 2.2, duration: 0.5 } },
               }}
               className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)] font-semibold"
             >
-              Find out where.
+              Find out.
             </motion.span>
           </motion.p>
         )}
