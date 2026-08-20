@@ -77,13 +77,11 @@ export async function drawShareCard(data: ShareData): Promise<string> {
     const img = new Image();
     await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = "/logo-gold.png"; });
     ctx.save();
-    ctx.shadowColor = "rgba(255,179,64,0.35)";
-    ctx.shadowBlur = 40;
+    ctx.shadowColor = "rgba(255,179,64,0.3)";
+    ctx.shadowBlur = 30;
     roundRect(ctx, W / 2 - 100, 350, 200, 200, 24);
-    ctx.fillStyle = "#FFB340";
     ctx.strokeStyle = "#FFB340";
     ctx.lineWidth = 3;
-    ctx.fill();
     ctx.stroke();
     ctx.restore();
     ctx.save();
@@ -124,13 +122,13 @@ export async function drawShareCard(data: ShareData): Promise<string> {
 
   // APPREHENDED 紅章
   ctx.save();
-  ctx.translate(W - 210, 660);
+  ctx.translate(W - 290, 680);
   ctx.rotate(-0.24);
   ctx.strokeStyle = "#FF453A";
-  ctx.lineWidth = 7;
+  ctx.lineWidth = 5;
   ctx.fillStyle = "rgba(255,69,58,0.06)";
-  ctx.font = "900 60px -apple-system, sans-serif";
-  ctx.letterSpacing = "6px";
+  ctx.font = "900 46px -apple-system, sans-serif";
+  ctx.letterSpacing = "4px";
   const sw = ctx.measureText("APPREHENDED").width + 80;
   roundRect(ctx, -sw / 2, -52, sw, 104, 16);
   ctx.fill();
@@ -165,12 +163,12 @@ export async function drawShareCard(data: ShareData): Promise<string> {
 }
 
 // 保存分享卡到相簿(App 內用 Media 外掛;網站版用 download)
-export async function saveShareToPhotos(dataUrl: string): Promise<boolean> {
+export async function saveShareToPhotos(dataUrl: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const { Media } = await import("@capacitor-community/media");
     await Media.savePhoto({ path: dataUrl });
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.code || e?.message || e).slice(0, 60) };
   }
 }

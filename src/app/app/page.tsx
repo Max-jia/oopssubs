@@ -2371,9 +2371,9 @@ export default function AppPage() {
                     onClick={async () => {
                       if (!shareImg) return;
                       if (isNativeApp()) {
-                        const ok = await saveShareToPhotos(shareImg);
-                        setShareSaved(ok ? "Saved to Photos ✓" : "Save failed");
-                        setTimeout(() => setShareSaved(null), 2500);
+                        const res = await saveShareToPhotos(shareImg);
+                        setShareSaved(res.ok ? "Saved to Photos ✓" : `Save failed: ${res.error || "unknown"}`);
+                        setTimeout(() => setShareSaved(null), 3500);
                       } else {
                         // 網站版:觸發下載
                         const a = document.createElement("a");
@@ -2391,10 +2391,21 @@ export default function AppPage() {
                   <button
                     onClick={async () => {
                       try {
-                        const blob = await (await fetch(shareImg)).blob();
-                        const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
-                        if (navigator.share) {
-                          await navigator.share({ files: [file], title: "OopsSubs case report" });
+                        if (isNativeApp()) {
+                          // App 內:原生分享面板(支援圖片檔案)
+                          const { Share } = await import("@capacitor/share");
+                          await Share.share({
+                            title: "OopsSubs case report",
+                            url: shareImg,
+                            dialogTitle: "Share your case report",
+                          });
+                        } else {
+                          // 網站版:Web Share API(帶圖片檔案)
+                          const blob = await (await fetch(shareImg)).blob();
+                          const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
+                          if (navigator.share) {
+                            await navigator.share({ files: [file], title: "OopsSubs case report" });
+                          }
                         }
                       } catch { /* 用戶取消 */ }
                     }}
