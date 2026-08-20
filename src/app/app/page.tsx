@@ -1531,6 +1531,11 @@ export default function AppPage() {
   const scanningRef = useRef(false);
   const handleGmailScan = useCallback(async () => {
     if (scanningRef.current) return; // Prevent duplicate scans
+    // 未授權 Gmail:先彈信任窗(不顯示掃描畫面),用戶確認後才開始掃描
+    if (!getStoredToken()) {
+      setShowTrustModal(true);
+      return;
+    }
     scanningRef.current = true;
     setScanning(true); setError(""); setScanStatus(""); setScannedItems([]);
     // Safety timeout: if scan takes >45s, show error

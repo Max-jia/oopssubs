@@ -102,14 +102,34 @@ hiding from you."
             )}
           </h1>
         </motion.div>
-        <motion.p
-          className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-        >
-          Your money is going somewhere. Find out where.
-        </motion.p>
+        {/* 副標題:大標題打完後,逐字浮現 → 停頓 → 金色揭曉 */}
+        {taglineDone && (
+          <motion.p
+            className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.035, delayChildren: 0.6 } } }}
+          >
+            {"Your money is going somewhere. ".split("").map((ch, i) => (
+              <motion.span
+                key={i}
+                variants={{ hidden: { opacity: 0, y: 5 }, show: { opacity: 1, y: 0 } }}
+                className="inline-block"
+              >
+                {ch === " " ? " " : ch}
+              </motion.span>
+            ))}
+            <motion.span
+              variants={{
+                hidden: { opacity: 0, y: 6 },
+                show: { opacity: 1, y: 0, transition: { delay: 1.9, duration: 0.5 } },
+              }}
+              className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)] font-semibold"
+            >
+              Find out where.
+            </motion.span>
+          </motion.p>
+        )}
 
         {/* 證據牆:已破案案例(橫向滑動) */}
         <motion.div
