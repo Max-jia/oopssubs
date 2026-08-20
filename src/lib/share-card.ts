@@ -325,20 +325,15 @@ export async function drawFileCard(data: ShareData): Promise<string> {
   try {
     const img = new Image();
     await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = "/logo-gold.png"; });
-    ctx.drawImage(img, 140, H - 130, 64, 64);
+    ctx.drawImage(img, 140, H - 175, 64, 64);
   } catch { /* 跳過 */ }
   ctx.textAlign = "left";
   ctx.fillStyle = "#2B2116";
   ctx.font = "800 30px -apple-system, sans-serif";
-  ctx.fillText("OopsSubs", 226, H - 92);
+  ctx.fillText("OopsSubs", 226, H - 132);
   ctx.fillStyle = "#6B4F2E";
   ctx.font = "500 22px -apple-system, sans-serif";
-  ctx.fillText("oopssubs.com", 226, H - 52);
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#6B4F2E";
-  ctx.font = "700 22px -apple-system, sans-serif";
-  ctx.letterSpacing = "2px";
-  ctx.fillText("FIND YOURS →", W - 140, H - 60);
+  ctx.fillText("oopssubs.com", 226, H - 92);
 
   return canvas.toDataURL("image/png");
 }

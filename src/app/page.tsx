@@ -40,6 +40,7 @@ export default function HomePage() {
   const [closedCases, setClosedCases] = useState<{ name: string; amount: number; cycle: string; date: string }[]>([]);
   const [detectiveCases, setDetectiveCases] = useState(0);
   const [taglineDone, setTaglineDone] = useState(false);
+  const [subtitleDone, setSubtitleDone] = useState(false);
   useEffect(() => { enableRipple();
     setIsNative(isNativeApp());
     setClosedCases(getClosedCases().slice(-5).reverse());
@@ -47,17 +48,19 @@ export default function HomePage() {
   }, []);
   return (
     <main className="min-h-screen notebook-grid animate-fade-in overflow-x-hidden">
-      {/* 開場:CONFIDENTIAL 章蓋下後淡出 */}
-      <motion.div
-        className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 0 }}
-        transition={{ delay: 1.4, duration: 0.4 }}
-      >
-        <span className="stamp-in text-[34px] font-black tracking-[0.2em] text-[var(--red)] border-4 border-[var(--red)] rounded-xl px-6 py-3">
-          CONFIDENTIAL
-        </span>
-      </motion.div>
+      {/* 結尾:全部內容出現後,CONFIDENTIAL 章蓋下落款 */}
+      {subtitleDone && (
+        <motion.div
+          className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ delay: 2.2, duration: 0.5 }}
+        >
+          <span className="stamp-in text-[34px] font-black tracking-[0.2em] text-[var(--red)] border-4 border-[var(--red)] rounded-xl px-6 py-3">
+            CONFIDENTIAL
+          </span>
+        </motion.div>
+      )}
 
       {/* Hero */}
       <div className="max-w-md mx-auto px-6 pt-20 pb-14 text-center">
@@ -95,7 +98,7 @@ export default function HomePage() {
                 text="Some subscriptions are
 hiding from you."
                 speed={78}
-                startDelay={1500}
+                startDelay={500}
                 onComplete={() => setTaglineDone(true)}
                 className="text-[var(--text)]"
               />
@@ -108,6 +111,7 @@ hiding from you."
             className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-8 max-w-xs mx-auto"
             initial="hidden"
             animate="show"
+            onAnimationComplete={() => setSubtitleDone(true)}
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.7 } } }}
           >
             {"Your money is going somewhere… ".split("").map((ch, i) => (
@@ -132,11 +136,12 @@ hiding from you."
         )}
 
         {/* 證據牆:已破案案例(橫向滑動) */}
+        {subtitleDone && (
         <motion.div
           className="mb-8 text-left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65, duration: 0.5 }}
+          transition={{ duration: 0.5 }}
         >
           <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1">Closed cases</p>
           <div className="relative">
@@ -185,6 +190,7 @@ hiding from you."
             </div>
           </div>
         </motion.div>
+        )}
         <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
           <motion.a
             href={appHref("manual", isNative)}
