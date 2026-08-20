@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { drawShareCard, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
+import { drawFileCard, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
 
 // 偵探數據(與 app 頁共用邏輯)
 const DETECTIVE_KEY = "oopssubs_detective";
@@ -53,7 +53,7 @@ export default function ReportPage() {
   const handleShare = async () => {
     if (shareBusy) return;
     setShareBusy(true);
-    const url = await drawShareCard({
+    const url = await drawFileCard({
       cases: det.cases,
       streak: det.streak,
       recovered: totalRecovered,

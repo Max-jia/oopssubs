@@ -211,3 +211,137 @@ export async function shareCardNative(dataUrl: string): Promise<void> {
     await Share.share({ title: "OopsSubs case report", url: dataUrl, dialogTitle: "Share your case report" });
   }
 }
+
+// ── 版本 C:結案檔案夾封面(報告頁分享用) ──
+export async function drawFileCard(data: ShareData): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  const annual = (a: number, c: string) => (c === "yearly" ? a : a * 12);
+  const total = Math.round(data.recovered);
+  const closed = data.closed.slice(-5);
+
+  // 牛皮紙背景
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#C9A87C");
+  bg.addColorStop(0.45, "#B8925F");
+  bg.addColorStop(1, "#A67C49");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 紙紋(橫線)
+  ctx.strokeStyle = "rgba(43,33,22,0.07)";
+  ctx.lineWidth = 1;
+  for (let y = 0; y < H; y += 4) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // 金色標籤(CONFIDENTIAL)
+  ctx.fillStyle = "#FFB340";
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - 210, 0); ctx.lineTo(W / 2 + 210, 0);
+  ctx.lineTo(W / 2 + 210, 96); ctx.lineTo(W / 2 - 210, 96);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#2B2116";
+  ctx.textAlign = "center";
+  ctx.font = "900 30px -apple-system, sans-serif";
+  ctx.letterSpacing = "8px";
+  ctx.fillText("CONFIDENTIAL", W / 2, 62);
+
+  // 內框
+  ctx.strokeStyle = "rgba(43,33,22,0.5)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(60, 60, W - 120, H - 120);
+
+  // 標題
+  ctx.fillStyle = "#2B2116";
+  ctx.font = "900 78px -apple-system, sans-serif";
+  ctx.letterSpacing = "4px";
+  ctx.fillText("CASE FILE", W / 2, 260);
+  ctx.fillStyle = "#6B4F2E";
+  ctx.font = "800 34px -apple-system, sans-serif";
+  ctx.letterSpacing = "8px";
+  ctx.fillText(`FILE #${data.cases} · 2026`, W / 2, 320);
+
+  // 分隔線
+  ctx.strokeStyle = "rgba(43,33,22,0.4)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(140, 370); ctx.lineTo(W - 140, 370); ctx.stroke();
+
+  // 欄位
+  const field = (label: string, value: string, y: number, gold = false) => {
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#6B4F2E";
+    ctx.font = "800 22px -apple-system, sans-serif";
+    ctx.letterSpacing = "4px";
+    ctx.fillText(label.toUpperCase(), 140, y);
+    ctx.fillStyle = gold ? "#8B5E1F" : "#2B2116";
+    ctx.font = "800 42px -apple-system, sans-serif";
+    ctx.letterSpacing = "0px";
+    ctx.fillText(value, 140, y + 52);
+  };
+  field("Subject", "Your forgotten subscriptions", 440);
+  field("Status", `${data.cases} CASES CLOSED`, 550);
+  ctx.fillStyle = "#8B5E1F";
+  ctx.font = "700 34px -apple-system, sans-serif";
+  ctx.fillText(`${rankTitle(data.cases)}`, 140, 602);
+  field("Recovered", `${fmt(total)} / YEAR`, 680, true);
+
+  // 破案清單
+  let y = 820;
+  ctx.textAlign = "left";
+  for (const c of closed) {
+    ctx.fillStyle = "#2B2116";
+    ctx.font = "700 30px -apple-system, sans-serif";
+    ctx.fillText(c.name, 140, y);
+    ctx.fillStyle = "#1E7A3A";
+    ctx.font = "900 22px -apple-system, sans-serif";
+    ctx.letterSpacing = "3px";
+    ctx.fillText("CLOSED", W - 140 - ctx.measureText("CLOSED").width, y);
+    ctx.strokeStyle = "rgba(43,33,22,0.2)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(140, y + 26); ctx.lineTo(W - 140, y + 26); ctx.stroke();
+    y += 78;
+  }
+
+  // CLOSED 大紅章
+  ctx.save();
+  ctx.translate(W - 220, 1030);
+  ctx.rotate(-0.2);
+  ctx.strokeStyle = "#B3261E";
+  ctx.lineWidth = 6;
+  ctx.fillStyle = "rgba(179,38,30,0.08)";
+  ctx.font = "900 56px -apple-system, sans-serif";
+  ctx.letterSpacing = "4px";
+  const sw = ctx.measureText("CLOSED").width + 80;
+  roundRect(ctx, -sw / 2, -52, sw, 104, 16);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#B3261E";
+  ctx.textAlign = "center";
+  ctx.fillText("CLOSED", 0, 16);
+  ctx.restore();
+
+  // 底部品牌
+  try {
+    const img = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = "/logo-gold.png"; });
+    ctx.drawImage(img, 140, H - 130, 64, 64);
+  } catch { /* 跳過 */ }
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#2B2116";
+  ctx.font = "800 30px -apple-system, sans-serif";
+  ctx.fillText("OopsSubs", 226, H - 92);
+  ctx.fillStyle = "#6B4F2E";
+  ctx.font = "500 22px -apple-system, sans-serif";
+  ctx.fillText("oopssubs.com", 226, H - 52);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "#6B4F2E";
+  ctx.font = "700 22px -apple-system, sans-serif";
+  ctx.letterSpacing = "2px";
+  ctx.fillText("FIND YOURS →", W - 140, H - 60);
+
+  return canvas.toDataURL("image/png");
+}
