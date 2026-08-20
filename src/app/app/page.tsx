@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
 import { initPurchases, checkPro, buyPro, restorePro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
 import { enableRipple } from "@/lib/ripple";
-import { drawShareCard } from "@/lib/share-card";
+import { drawShareCard, saveShareToPhotos } from "@/lib/share-card";
 import { cancelGuides } from "@/data/cancel-guides";
 import { Browser } from "@capacitor/browser";
 import { App as CapApp } from "@capacitor/app";
@@ -1037,6 +1037,7 @@ export default function AppPage() {
   const [restoring, setRestoring] = useState(false);
   const [shareImg, setShareImg] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  const [shareSaved, setShareSaved] = useState<string | null>(null);
   // 首次看到列表時,第一行自動演示一次左滑教學
   // 全局錯誤捕獲:崩潰時把具體錯誤顯示在畫面上(用戶可原文回報,協助遠端排查)
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -1102,14 +1103,14 @@ export default function AppPage() {
   const startScan = useCallback(async (token: string) => {
     try {
       await initGapiClient(token);
-      setScanning(true); setScanStatus("Searching inbox...");
+      setScanning(true); setScanStatus("Searching for clues…");
       const messages = await searchSubscriptionEmails(token);
-      if (messages.length === 0) { setScannedItems([]); setError("No subscription-related emails found in the last 2 years. Try adding manually."); setScanning(false); return; }
-      setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+      if (messages.length === 0) { setScannedItems([]); setError("No clues found — your inbox is clean. Try adding manually."); setScanning(false); return; }
+      setScanStatus(`Examining ${Math.min(messages.length, 35)} pieces of evidence…`);
       const bodies: { text: string; trialEnd: string }[] = [];
       for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
       const dedupedBodies = dedupeBodiesBySender(bodies);
-      setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+      setScanStatus(`The inspector is analyzing ${dedupedBodies.length} clues…`);
       const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
       if (extracted.length === 0) setError(`AI analyzed ${bodies.length} emails but found no subscriptions.`);
       setScannedItems(extracted); setScanning(false); setScanStatus("");
@@ -1547,14 +1548,14 @@ export default function AppPage() {
       }
       const doScan = async (token: string) => {
         localStorage.setItem(TOKEN_KEY, token); await initGapiClient(token);
-        setScanStatus("Searching inbox...");
+        setScanStatus("Searching for clues…");
         const messages = await searchSubscriptionEmails(token);
         if (messages.length === 0) { setScannedItems([]); setError(`No subscription-related emails found in the last 2 years. Try adding manually.`); clearTimeout(timeout); scanningRef.current = false; setScanning(false); setScanStatus(""); return; }
-        setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+        setScanStatus(`Examining ${Math.min(messages.length, 35)} pieces of evidence…`);
         const bodies: { text: string; trialEnd: string }[] = [];
         for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(token, msg.id); if (body.text) bodies.push(body); }
         const dedupedBodies = dedupeBodiesBySender(bodies);
-        setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+        setScanStatus(`The inspector is analyzing ${dedupedBodies.length} clues…`);
         const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
         if (extracted.length === 0) {
           setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually or check if your subscription emails are in a different folder.`);
@@ -1566,19 +1567,19 @@ export default function AppPage() {
       if (stored) {
         try {
           await initGapiClient(stored);
-          setScanStatus("Searching inbox...");
+          setScanStatus("Searching for clues…");
           const messages = await searchSubscriptionEmails(stored);
           if (messages.length === 0) {
             setScannedItems([]);
-            setError("No subscription-related emails found in the last 2 years. Try adding manually.");
+            setError("No clues found — your inbox is clean. Try adding manually.");
             clearTimeout(timeout); setScanning(false); setScanStatus("");
             return;
           }
-          setScanStatus(`Reading ${Math.min(messages.length, 35)} emails...`);
+          setScanStatus(`Examining ${Math.min(messages.length, 35)} pieces of evidence…`);
           const bodies: { text: string; trialEnd: string }[] = [];
           for (const msg of messages.slice(0, 35)) { const body = await getEmailBody(stored, msg.id); if (body.text) bodies.push(body); }
           const dedupedBodies = dedupeBodiesBySender(bodies);
-          setScanStatus(`AI analyzing ${dedupedBodies.length} emails...`);
+          setScanStatus(`The inspector is analyzing ${dedupedBodies.length} clues…`);
           const extracted = dedupeSubs(await extractSubsWithAI(dedupedBodies));
           if (extracted.length === 0) {
             setError(`AI analyzed ${bodies.length} emails but found no subscriptions. Checked ${messages.length} inbox matches total. Try adding manually.`);
@@ -1865,7 +1866,7 @@ export default function AppPage() {
                 </div>
               </div>
             </div>
-            <p className="text-[17px] font-semibold mb-2">{scanStatus || "Scanning your inbox"}</p>
+            <p className="text-[17px] font-semibold mb-2">{scanStatus || "Investigating your inbox"}</p>
             {/* Animated dots */}
             <div className="flex items-center justify-center gap-1.5 mb-3">
               <div className="w-1.5 h-1.5 rounded-full bg-[var(--text)] dot-pulse" />
@@ -2365,7 +2366,28 @@ export default function AppPage() {
                 exit={{ scale: 0.85, opacity: 0 }}
               >
                 <img src={shareImg} alt="Your detective case report" className="w-full rounded-2xl shadow-2xl" />
-                <div className="flex gap-3 mt-4">
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={async () => {
+                      if (!shareImg) return;
+                      if (isNativeApp()) {
+                        const ok = await saveShareToPhotos(shareImg);
+                        setShareSaved(ok ? "Saved to Photos ✓" : "Save failed");
+                        setTimeout(() => setShareSaved(null), 2500);
+                      } else {
+                        // 網站版:觸發下載
+                        const a = document.createElement("a");
+                        a.href = shareImg;
+                        a.download = "oopssubs-case-report.png";
+                        a.click();
+                        setShareSaved("Download started ✓");
+                        setTimeout(() => setShareSaved(null), 2500);
+                      }
+                    }}
+                    className="btn-gold flex-1 text-[13px] font-semibold py-3"
+                  >
+                    Save to Photos
+                  </button>
                   <button
                     onClick={async () => {
                       try {
@@ -2373,25 +2395,23 @@ export default function AppPage() {
                         const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
                         if (navigator.share) {
                           await navigator.share({ files: [file], title: "OopsSubs case report" });
-                        } else {
-                          alert("Long-press the image to save it, then share anywhere.");
                         }
-                      } catch { /* 用戶取消分享 */ }
+                      } catch { /* 用戶取消 */ }
                     }}
-                    className="btn-gold flex-1 text-[14px] font-semibold py-3"
+                    className="btn-secondary flex-1 text-[13px] font-semibold py-3"
                   >
                     Share
                   </button>
                   <button
                     onClick={() => setShareImg(null)}
-                    className="btn-secondary flex-1 text-[14px] font-semibold py-3"
+                    className="btn-secondary flex-1 text-[13px] font-semibold py-3"
                   >
                     Close
                   </button>
                 </div>
-                <p className="text-[11px] text-[var(--text-tertiary)] text-center mt-3">
-                  Tip: long-press the image to save it
-                </p>
+                {shareSaved && (
+                  <p className="text-[12px] text-[var(--green)] text-center mt-3">{shareSaved}</p>
+                )}
               </motion.div>
             </div>
           )}

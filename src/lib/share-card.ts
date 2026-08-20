@@ -1,4 +1,5 @@
 // 偵探破案風分享卡:Canvas 繪製 1080x1350 PNG(零依賴)
+// 版本 B:WANTED 通緝令海報
 interface ShareData {
   cases: number;
   streak: number;
@@ -36,156 +37,140 @@ export async function drawShareCard(data: ShareData): Promise<string> {
 
   const annual = (a: number, c: string) => (c === "yearly" ? a : a * 12);
   const total = Math.round(data.recovered);
+  const closed = data.closed.slice(-3);
 
-  // 背景漸層
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#0A0A0C");
-  bg.addColorStop(0.55, "#151519");
+  // 背景:radial 深色
+  const bg = ctx.createRadialGradient(W / 2, H * 0.2, 100, W / 2, H / 2, H * 0.9);
+  bg.addColorStop(0, "#1A1A20");
+  bg.addColorStop(0.6, "#0D0D10");
   bg.addColorStop(1, "#0A0A0C");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // 筆記本格線
-  ctx.strokeStyle = "rgba(255,255,255,0.035)";
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 56) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 56) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  // 做舊噪點
+  ctx.fillStyle = "rgba(255,255,255,0.02)";
+  for (let i = 0; i < 900; i++) {
+    ctx.fillRect(Math.random() * W, Math.random() * H, 1.6, 1.6);
+  }
 
-  // 角落金色膠帶
-  const tape = (x: number, y: number, angle: number) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-    ctx.fillStyle = "rgba(255,179,64,0.13)";
-    ctx.fillRect(-90, -22, 180, 44);
-    ctx.strokeStyle = "rgba(255,179,64,0.35)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-90, -22, 180, 44);
-    ctx.restore();
-  };
-  tape(70, 150, -0.5);
-  tape(W - 70, H - 150, -0.5);
+  // 金邊框
+  ctx.strokeStyle = "rgba(255,179,64,0.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(36, 36, W - 72, H - 72);
 
-  // 頂部
-  ctx.textAlign = "left";
+  // WANTED 大標
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#F5F5F7";
+  ctx.font = "900 118px -apple-system, sans-serif";
+  ctx.save();
+  ctx.translate(W / 2, 250);
+  ctx.letterSpacing = "26px";
+  ctx.fillText("WANTED", 0, 0);
+  ctx.restore();
   ctx.fillStyle = "#FFB340";
-  ctx.font = "800 30px -apple-system, sans-serif";
-  ctx.fillText("DETECTIVE FILE", 64, 100);
+  ctx.font = "600 28px -apple-system, sans-serif";
+  ctx.letterSpacing = "8px";
+  ctx.fillText("FOR UNLICENSED SUBSCRIPTION CHARGES", W / 2, 310);
+
+  // 頭像(金帽 logo)
+  try {
+    const img = new Image();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = "/logo-gold.png"; });
+    ctx.save();
+    ctx.shadowColor = "rgba(255,179,64,0.35)";
+    ctx.shadowBlur = 40;
+    roundRect(ctx, W / 2 - 100, 350, 200, 200, 24);
+    ctx.fillStyle = "#FFB340";
+    ctx.strokeStyle = "#FFB340";
+    ctx.lineWidth = 3;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    roundRect(ctx, W / 2 - 100, 350, 200, 200, 24);
+    ctx.clip();
+    ctx.drawImage(img, W / 2 - 100, 350, 200, 200);
+    ctx.restore();
+  } catch { /* logo 失敗跳過 */ }
   ctx.fillStyle = "#98989F";
   ctx.font = "600 24px -apple-system, sans-serif";
-  ctx.fillText("SUBSCRIPTION CASES · 2026", 64, 140);
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#F5F5F7";
-  ctx.font = "800 44px -apple-system, sans-serif";
-  ctx.fillText(fmt(total), W - 64, 106);
-  ctx.fillStyle = "#98989F";
-  ctx.font = "600 22px -apple-system, sans-serif";
-  ctx.fillText("RECOVERED", W - 64, 142);
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(64, 175); ctx.lineTo(W - 64, 175); ctx.stroke();
+  ctx.fillText(`THE SUBSCRIPTION SQUAD · ${data.cases} APPREHENDED`, W / 2, 610);
 
-  // 等級徽章
-  const rank = rankTitle(data.cases);
-  ctx.save();
-  ctx.textAlign = "center";
-  ctx.font = "700 30px -apple-system, sans-serif";
-  const bw = ctx.measureText(`DETECTIVE · ${data.cases} CASES CLOSED`).width + 72;
-  ctx.strokeStyle = "rgba(255,179,64,0.55)";
-  ctx.lineWidth = 2;
-  ctx.fillStyle = "rgba(255,179,64,0.06)";
-  roundRect(ctx, (W - bw) / 2, 215, bw, 62, 31);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#FFB340";
-  ctx.fillText(`DETECTIVE · ${data.cases} CASES CLOSED`, W / 2, 256);
-  ctx.restore();
-
-  // 中央大金額
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#6E6E76";
-  ctx.font = "600 26px -apple-system, sans-serif";
-  ctx.fillText("RECOVERED FROM FORGOTTEN SUBSCRIPTIONS", W / 2, 420);
-  const g = ctx.createLinearGradient(0, 470, 0, 670);
-  g.addColorStop(0, "#FFC766");
-  g.addColorStop(1, "#FF9F0A");
-  ctx.fillStyle = g;
-  ctx.font = "800 190px -apple-system, sans-serif";
-  ctx.fillText(fmt(total), W / 2, 600);
-  ctx.fillStyle = "#98989F";
-  ctx.font = "700 34px -apple-system, sans-serif";
-  ctx.fillText("PER YEAR", W / 2, 660);
-
-  // 破案清單(最近 5 個)
-  const closed = data.closed.slice(-5);
-  ctx.textAlign = "left";
-  let y = 760;
+  // 通緝犯名單
+  let y = 700;
   for (const c of closed) {
     const amt = Math.round(annual(c.amount, c.cycle));
-    ctx.fillStyle = "#6E6E76";
-    ctx.font = "800 26px -apple-system, sans-serif";
-    ctx.fillText("CASE", 96, y);
+    ctx.save();
+    roundRect(ctx, 120, y, W - 240, 128, 14);
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+    ctx.textAlign = "left";
     ctx.fillStyle = "#F5F5F7";
-    ctx.font = "600 34px -apple-system, sans-serif";
-    ctx.fillText(c.name, 250, y);
+    ctx.font = "700 34px -apple-system, sans-serif";
+    ctx.fillText(c.name.toUpperCase(), 160, y + 48);
+    ctx.fillStyle = "#98989F";
+    ctx.font = "500 20px -apple-system, sans-serif";
+    ctx.fillText(`CHARGE: ${fmt(amt)}/YEAR · UNLICENSED CHARGES`, 160, y + 82);
     ctx.textAlign = "right";
     ctx.fillStyle = "#30D158";
     ctx.font = "700 30px -apple-system, sans-serif";
-    ctx.fillText(fmt(amt), W - 300, y);
-    // CLOSED 小章
-    ctx.save();
-    ctx.translate(W - 150, y - 10);
-    ctx.rotate(-0.1);
-    ctx.strokeStyle = "#30D158";
-    ctx.lineWidth = 2.5;
-    ctx.fillStyle = "transparent";
-    ctx.font = "800 22px -apple-system, sans-serif";
-    const tw = ctx.measureText("CLOSED").width + 28;
-    roundRect(ctx, -tw / 2, -24, tw, 44, 8);
-    ctx.stroke();
-    ctx.fillStyle = "#30D158";
-    ctx.fillText("CLOSED", 0, 7);
-    ctx.restore();
-    ctx.textAlign = "left";
-    ctx.strokeStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath(); ctx.moveTo(96, y + 34); ctx.lineTo(W - 96, y + 34); ctx.stroke();
-    y += 78;
+    ctx.fillText(fmt(amt), W - 160, y + 52);
+    y += 152;
   }
 
-  // RECOVERED 大紅章(蓋在金額右側)
+  // APPREHENDED 紅章
   ctx.save();
-  ctx.translate(W - 210, 545);
-  ctx.rotate(-0.21);
+  ctx.translate(W - 210, 660);
+  ctx.rotate(-0.24);
   ctx.strokeStyle = "#FF453A";
-  ctx.lineWidth = 8;
-  ctx.fillStyle = "rgba(255,69,58,0.05)";
-  ctx.font = "900 72px -apple-system, sans-serif";
-  const sw = ctx.measureText("RECOVERED").width + 80;
-  roundRect(ctx, -sw / 2, -55, sw, 110, 18);
+  ctx.lineWidth = 7;
+  ctx.fillStyle = "rgba(255,69,58,0.06)";
+  ctx.font = "900 60px -apple-system, sans-serif";
+  ctx.letterSpacing = "6px";
+  const sw = ctx.measureText("APPREHENDED").width + 80;
+  roundRect(ctx, -sw / 2, -52, sw, 104, 16);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#FF453A";
   ctx.textAlign = "center";
-  ctx.fillText("RECOVERED", 0, 16);
+  ctx.fillText("APPREHENDED", 0, 16);
   ctx.restore();
 
-  // 底部品牌
+  // 底部:品牌 + 等級
   try {
     const img = new Image();
     await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = "/logo-gold.png"; });
-    ctx.drawImage(img, 64, H - 140, 76, 76);
-  } catch { /* logo 載入失敗就跳過 */ }
+    ctx.drawImage(img, 64, H - 140, 72, 72);
+  } catch { /* 跳過 */ }
   ctx.textAlign = "left";
   ctx.fillStyle = "#F5F5F7";
-  ctx.font = "800 36px -apple-system, sans-serif";
-  ctx.fillText("OopsSubs", 164, H - 88);
+  ctx.font = "800 34px -apple-system, sans-serif";
+  ctx.fillText("OopsSubs", 158, H - 92);
   ctx.fillStyle = "#6E6E76";
-  ctx.font = "500 26px -apple-system, sans-serif";
-  ctx.fillText("oopssubs.com", 164, H - 48);
+  ctx.font = "500 24px -apple-system, sans-serif";
+  ctx.fillText("oopssubs.com", 158, H - 52);
   ctx.textAlign = "right";
-  ctx.fillStyle = "#6E6E76";
+  ctx.fillStyle = "#FFB340";
+  ctx.font = "800 26px -apple-system, sans-serif";
+  ctx.fillText(`${rankTitle(data.cases)} · ${data.cases} CASES`, W - 64, H - 92);
+  ctx.fillStyle = "#98989F";
   ctx.font = "600 22px -apple-system, sans-serif";
-  ctx.fillText("FIND YOURS →", W - 64, H - 60);
+  ctx.fillText(`${fmt(total)} RECOVERED / YEAR`, W - 64, H - 52);
 
   return canvas.toDataURL("image/png");
+}
+
+// 保存分享卡到相簿(App 內用 Media 外掛;網站版用 download)
+export async function saveShareToPhotos(dataUrl: string): Promise<boolean> {
+  try {
+    const { Media } = await import("@capacitor-community/media");
+    await Media.savePhoto({ path: dataUrl });
+    return true;
+  } catch {
+    return false;
+  }
 }
