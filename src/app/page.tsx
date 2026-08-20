@@ -48,13 +48,13 @@ export default function HomePage() {
   }, []);
   return (
     <main className="min-h-screen notebook-grid animate-fade-in overflow-x-hidden">
-      {/* 結尾:全部內容出現後,CONFIDENTIAL 章蓋下落款 */}
-      {subtitleDone && (
+      {/* 結尾:有破案紀錄的用戶,CONFIDENTIAL 章蓋下落款;新用戶沒有案子,不蓋 */}
+      {subtitleDone && detectiveCases > 0 && (
         <motion.div
           className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ delay: 2.2, duration: 0.5 }}
+          transition={{ delay: 2.6, duration: 0.5 }}
         >
           <span className="stamp-in text-[34px] font-black tracking-[0.2em] text-[var(--red)] border-4 border-[var(--red)] rounded-xl px-6 py-3">
             CONFIDENTIAL
@@ -96,8 +96,8 @@ export default function HomePage() {
             ) : (
               <Typewriter
                 words={["Some", "subscriptions", "are", "hiding", "from", "you."]}
-                wordSpeed={130}
-                startDelay={300}
+                wordSpeed={190}
+                startDelay={400}
                 onComplete={() => setTaglineDone(true)}
                 className="text-[var(--text)]"
               />
@@ -111,7 +111,7 @@ export default function HomePage() {
             initial="hidden"
             animate="show"
             onAnimationComplete={() => setSubtitleDone(true)}
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.02, delayChildren: 0.4 } } }}
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.03, delayChildren: 0.5 } } }}
           >
             {"Your money is going somewhere… ".split("").map((ch, i) => (
               <motion.span
@@ -125,7 +125,7 @@ export default function HomePage() {
             <motion.span
               variants={{
                 hidden: { opacity: 0 },
-                show: { opacity: 1, transition: { delay: 0.9, duration: 0.4 } },
+                show: { opacity: 1, transition: { delay: 1.1, duration: 0.4 } },
               }}
               className="text-transparent bg-clip-text bg-gradient-to-b from-[var(--brand)] to-[var(--brand-strong)] font-semibold"
             >
