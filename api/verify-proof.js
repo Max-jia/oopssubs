@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     `  1) An explicit cancellation confirmation — text like "cancelled", "canceled", "you've cancelled", "cancellation confirmed", "cancelled on <date>".\n` +
     `  2) A subscription status that is NOT active — "Expired", "Ends on", "Won't renew", "Inactive".\n` +
     `  3) The account/settings page showing NO active subscription for this service — "No subscription", "You are not subscribed", "Unsubscribed", or an empty subscription list.\n` +
-    `The subscription name ("${name}") must appear in the screenshot (or be clearly identifiable from it).\n` +
+    `The subscription name ("${name}") must appear in the screenshot (or be clearly identifiable from it). Voice or OCR transcription may have pronunciation/typo errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "netflix" ≈ "Netflix").\n` +
     `FAIL if: the screenshot is unrelated to "${name}" or to cancellation; it shows an ACTIVE subscription ("Active", "Subscribed", a list with this service and no cancelled mark); it only shows a billing/receipt page, login page, home page, or is too blurry/ambiguous to read.`;
 
   const promptA =
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
     `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
     (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
     `. Listen to the audio and transcribe it.\n` +
-    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name (or an unmistakable reference to it) and a cancellation statement must both be present.\n` +
+    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo"). The service reference (or an unmistakable close match) and a cancellation statement must both be present.\n` +
     `FAIL if: the service name is missing or unclear; there is no clear cancellation statement; the speech is too unclear/too short to understand; or the person seems to be reading something unrelated.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
 
@@ -183,9 +183,10 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: useTextOnly || !audioBase64 ? "qwen3.8-max" : "qwen-audio-3.0-asr-flash",
+        model: useTextOnly || !audioBase64 ? "qwen3.6-flash" : "qwen-audio-3.0-asr-flash",
         messages: [{ role: "user", content }],
         max_tokens: 300,
+        enable_thinking: false,
       }),
     });
     const data = await gemRes.json();
