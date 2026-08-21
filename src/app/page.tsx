@@ -139,7 +139,7 @@ export default function HomePage() {
         </div>
 
         {/* 證據牆:已破案案例(橫向滑動) */}
-        <div className="h-[215px]">
+        <div className="h-[240px]">
         {subtitleDone && (
         <motion.div
           className="mb-8 text-left"
@@ -175,12 +175,12 @@ export default function HomePage() {
               );
             }) : (
               /* 新用戶:空檔案牆 */
-              <div className="card text-center py-10 px-6">
-                <svg className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <div className="card text-center py-6 px-6">
+                <svg className="w-8 h-8 text-[var(--text-tertiary)] mx-auto mb-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                 </svg>
                 <p className="text-[13px] font-black tracking-[0.16em] text-[var(--text-tertiary)] uppercase mb-1.5">Case file: empty</p>
-                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4 max-w-[240px] mx-auto">
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-3 max-w-[240px] mx-auto">
                   Your first case is waiting. Find a forgotten subscription and close it.
                 </p>
                 <Link
