@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     `PASS only if the service name and a clear cancellation statement are both clearly audible.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
-  const callGemini = async (prompt) => {
+  const callGemini = async (prompt, retries = 2) => {
     const gemRes = await fetch(GEMINI_URL, {
       method: "POST",
       headers: {
@@ -132,6 +132,11 @@ export default async function handler(req, res) {
     });
     const data = await gemRes.json();
     if (!gemRes.ok) {
+      // 429 配額超限:等待後重試(免費層分鐘級配額,稍等即恢復)
+      if (gemRes.status === 429 && retries > 0) {
+        await new Promise((r) => setTimeout(r, 3000));
+        return callGemini(prompt, retries - 1);
+      }
       console.error("verify-proof Gemini error:", gemRes.status, JSON.stringify(data).slice(0, 300));
       return null;
     }
