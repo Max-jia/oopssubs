@@ -2418,7 +2418,18 @@ export default function AppPage() {
                         animate={{ x: [0, -6, 6, -4, 4, 0] }}
                         transition={{ duration: 0.5 }}
                       >
-                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
+                        {proof.isAudio ? (
+                          <div className="w-full h-40 flex items-center justify-center">
+                            <div className="text-center">
+                              <svg className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                              </svg>
+                              <p className="text-[12px] text-[var(--text-tertiary)]">Testimony on file</p>
+                            </div>
+                          </div>
+                        ) : (
+                          proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />
+                        )}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
                             className="border-[5px] border-[var(--green)] text-[var(--green)] rounded-xl px-8 py-3 text-[24px] font-black tracking-[0.2em] rotate-[-12deg] bg-[var(--green-dim)]/50"
@@ -2454,7 +2465,18 @@ export default function AppPage() {
                         animate={{ x: [0, -6, 6, -4, 4, 0] }}
                         transition={{ duration: 0.5 }}
                       >
-                        {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
+                        {proof.isAudio ? (
+                          <div className="w-full h-40 flex items-center justify-center">
+                            <div className="text-center">
+                              <svg className="w-10 h-10 text-[var(--text-tertiary)] mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                              </svg>
+                              <p className="text-[12px] text-[var(--text-tertiary)]">Testimony on file</p>
+                            </div>
+                          </div>
+                        ) : (
+                          proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />
+                        )}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
                             className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-8 py-3 text-[20px] font-black tracking-[0.2em] rotate-[8deg] bg-[var(--red-dim)]/50"
