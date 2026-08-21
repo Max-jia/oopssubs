@@ -222,6 +222,40 @@ const AUDIO_LINES_FAIL = [
   "The witness is unclear. The court needs better words.",
   "That's not a clear confession. Try again.",
 ];
+// 偵探調戲台詞(審核通過但故意要重錄——英語世界幽默風格)
+const TEASE_LINES = [
+  "I say, that was rather convincing. Which, of course, makes me rather suspicious. Once more.",
+  "Jolly good. One more time, for the archives. We keep records, you know.",
+  "That was almost too honest. Dreadfully suspicious. Let's hear it again.",
+  "Okay, that actually sounded legit. Annoyingly legit. Say it again.",
+  "I wanted to catch you lying, but you were telling the truth. Unfair. Again.",
+  "Nice one. Too nice. One more take, champ.",
+  "You're making this hard. I was ready to reject you. Run it back.",
+  "The court accepts your words… but requests a second reading. For the record.",
+  "Overruled — your first take. Sustained — if you say it again. Proceed.",
+  "The court notes your testimony. The court also notes it wants to hear it again.",
+  "Counselor, that was a fine statement. The jury wants an encore.",
+  "It's a convincing story, kid. Too convincing. Let's run it back.",
+  "The tape says you're telling the truth. The tape lies. One more.",
+  "I've heard confessions all my life. Yours was… clean. Too clean. Again.",
+  "Every detective knows: when it sounds too true, check twice. Go.",
+  "Right then. That'll do — but it won't quite do. Once more, if you please.",
+  "Not bad. Not bad at all. Which is precisely why I'd like it once more.",
+  "Yes, yes. Quite clear. Humor me with a second take.",
+];
+// 第 3 次必過時的可能彩蛋
+const CLEARANCE_LINES = [
+  "Fine. FINE. The court is satisfied. Case closed.",
+  "I wanted a third take, but my coffee's cold. Approved.",
+  "Three times the charm. Official clearance granted.",
+];
+// 調戲機率:第 1 次 50%、第 2 次 30%、之後必放行
+function shouldTease(teaseCount: number): boolean {
+  if (teaseCount >= 2) return false;
+  const chance = teaseCount === 0 ? 0.5 : 0.3;
+  return Math.random() < chance;
+}
+
 function pickDetectiveLine(pass: boolean, name: string, isAudio = false): string {
   if (isAudio) {
     const pool = pass ? AUDIO_LINES_PASS : AUDIO_LINES_FAIL;
@@ -1153,7 +1187,9 @@ export default function AppPage() {
   // 取消證據流程（取消證明制：沒交截圖證明，取消提醒會一直持續）
   const [proof, setProof] = useState<{
     sub: Subscription;
-    stage: "select" | "audio" | "reviewing" | "result" | "confirm" | "done";
+    stage: "select" | "audio" | "reviewing" | "result" | "teased" | "confirm" | "done";
+    teaseCount: number;
+    teaseLine: string;
     image: string | null;
     audio: string | null;
     isAudio: boolean;
@@ -1509,7 +1545,7 @@ export default function AppPage() {
 
   /* ── 取消證據流程 ── */
   const openProofFlow = useCallback((sub: Subscription) => {
-    setProof({ sub, stage: "select", image: null, audio: null, isAudio: false, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0 });
+    setProof({ sub, stage: "select", image: null, audio: null, isAudio: false, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0, teaseCount: 0, teaseLine: "" });
   }, []);
 
   // 關閉證據流程：沒完成 = 列入追債清單（保留首次開始時間，天數才不會被重開重置）
@@ -1610,7 +1646,20 @@ export default function AppPage() {
     setProof(p => (p ? { ...p, stage: "reviewing", verdict: null, aiError: false } : p));
     try {
       const verdict = await callVerifyProof(proof.sub, proof.audio, true);
-      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name, p.isAudio), stage: "result" } : p));
+      setProof(p => {
+        if (!p) return p;
+        // 通過但被調戲 → 回錄音(機率遞減)
+        if (verdict.passed && shouldTease(p.teaseCount)) {
+          const used = new Set(p.teaseCount ? JSON.parse(localStorage.getItem("oopssubs_tease_used") || "[]") : []);
+          const pool = TEASE_LINES.filter((l) => !used.has(l));
+          const line = pool[Math.floor(Math.random() * pool.length)] || TEASE_LINES[0];
+          used.add(line);
+          try { localStorage.setItem("oopssubs_tease_used", JSON.stringify(Array.from(used))); } catch { /* noop */ }
+          return { ...p, verdict, aiError: false, line, stage: "teased", teaseCount: p.teaseCount + 1 };
+        }
+        const clearance = verdict.passed && p.teaseCount >= 1 ? CLEARANCE_LINES[Math.floor(Math.random() * CLEARANCE_LINES.length)] : null;
+        return { ...p, verdict, aiError: false, line: clearance || pickDetectiveLine(verdict.passed, p.sub.name, p.isAudio), stage: "result" };
+      });
     } catch {
       setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
     }
@@ -2391,6 +2440,24 @@ export default function AppPage() {
                       <p className="text-[16px] font-semibold text-[var(--text)] mb-1">Inspector is examining your evidence…</p>
                       <p className="text-[13px] text-[var(--text-secondary)]">Looking for the {proof.sub.name} cancellation confirmation.</p>
                     </div>
+                  </div>
+                )}
+
+                {proof.stage === "teased" && (
+                  <div className="text-center pt-6">
+                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                      <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">The detective wants an encore</h3>
+                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-6 max-w-[300px] mx-auto italic">"{proof.teaseLine}"</p>
+                    <button onClick={() => { setAudioUrl(null); setProof(p => (p ? { ...p, stage: "audio", verdict: null, aiError: false, line: "", audio: null } : p)); }} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
+                      Record again
+                    </button>
+                    <button onClick={() => { setAudioUrl(null); setProof(p => (p ? { ...p, stage: "select", verdict: null, aiError: false, line: "", audio: null } : p)); }} className="btn-secondary text-[16px] py-4 w-full">
+                      Switch to screenshot
+                    </button>
                   </div>
                 )}
 
