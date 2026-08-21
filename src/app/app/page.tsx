@@ -2454,7 +2454,7 @@ export default function AppPage() {
                           <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
                       </div>
-                      <button onClick={() => setProof(p => (p ? { ...p, verified: "ai", stage: "confirm" } : p))} className="btn-primary text-[16px] font-semibold py-4 w-full">Continue</button>
+                      <button onClick={() => { setProof(p => (p ? { ...p, verified: "ai" } : p)); finishProof(); }} className="btn-primary text-[16px] font-semibold py-4 w-full">Confirm cancellation</button>
                     </div>
                   ) : (
                     <div className="pt-6">
