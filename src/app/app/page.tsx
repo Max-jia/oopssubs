@@ -137,6 +137,7 @@ async function webmToWavDataUrl(blob: Blob): Promise<string> {
   const source = offline.createBufferSource();
   source.buffer = audioBuffer;
   source.connect(offline.destination);
+  source.start();  // 必須 start 才會渲染出聲音(缺失 = 靜音 wav)
   const rendered = await offline.startRendering();
   // 編碼 WAV(16-bit PCM)
   const data = rendered.getChannelData(0);
@@ -2456,7 +2457,7 @@ export default function AppPage() {
                         {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
-                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-6 py-3 text-[20px] font-black tracking-[0.15em] rotate-[8deg] bg-[var(--red-dim)]/50"
+                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-8 py-3 text-[20px] font-black tracking-[0.2em] rotate-[8deg] bg-[var(--red-dim)]/50"
                             initial={{ scale: 2.5, opacity: 0, rotate: 14 }}
                             animate={{ scale: 1, opacity: 1, rotate: 8 }}
                             transition={{ type: "spring", stiffness: 400, damping: 14 }}
