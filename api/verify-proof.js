@@ -103,30 +103,79 @@ export default async function handler(req, res) {
     `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
     (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
     `. Listen to the audio and transcribe it.\n` +
-    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — e.g. "I cancelled ${name}", "I ended my ${name} subscription", "${name} is cancelled". The service name (or an unmistakable reference to it) and a cancellation statement must both be present.\n` +
+    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name (or an unmistakable reference to it) and a cancellation statement must both be present.\n` +
     `FAIL if: the service name is missing or unclear; there is no clear cancellation statement; the speech is too unclear/too short to understand; or the person seems to be reading something unrelated.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
 
   const audioPromptB =
     `You are an adversarial second reviewer for the same claim: the user recorded "${name}" cancellation testimony. Be skeptical.\n` +
-    `Find ANY reason the testimony is unreliable: unclear speech, missing service name, no explicit cancellation statement, too short, background noise making it unintelligible, or sounding scripted/coached in a way that obscures the actual claim. If unsure, FAIL.\n` +
-    `PASS only if the service name and a clear cancellation statement are both clearly audible.\n` +
+    `Find ANY reason the testimony is unreliable: the service name is missing, no clear cancellation statement, or the speech is unintelligible due to noise. Do NOT fail for being brief — a short clear statement is valid testimony. If unsure, FAIL.\n` +
+    `PASS only if the service name and a clear cancellation statement are both clearly audible (accept "cancel", "cancelled", "canceled", "ended", "stopped").\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
-  const callDashScope = async (prompt, retries = 2) => {
-    // OpenAI 相容格式:圖片用 image_url,語音用 input_audio
-    const content = audioBase64
-      ? [
-          { type: "text", text: prompt },
-          {
-            type: "input_audio",
-            input_audio: { data: audioBase64, format: (mimeType || "audio/wav").includes("mp4") ? "mp3" : "wav" },
-          },
-        ]
-      : [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
-        ];
+  // ── 阿里雲 NLS 一句話識別(極速版):同步轉寫語音 ──
+  const crypto = require("crypto");
+
+  async function createNlsToken() {
+    const ak = process.env.ALIYUN_AK_ID;
+    const sk = process.env.ALIYUN_AK_SECRET;
+    if (!ak || !sk) throw new Error("aliyun ak/sk missing");
+    const params = {
+      AccessKeyId: ak,
+      Action: "CreateToken",
+      Format: "JSON",
+      SignatureMethod: "HMAC-SHA1",
+      SignatureNonce: crypto.randomUUID(),
+      SignatureVersion: "1.0",
+      Timestamp: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+      Version: "2019-02-28",
+    };
+    const encode = (v) => encodeURIComponent(String(v)).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+    const canonical = Object.keys(params).sort().map((k) => `${encode(k)}=${encode(params[k])}`).join("&");
+    const stringToSign = "POST&%2F&" + encode(canonical);
+    const sig = crypto.createHmac("sha1", sk + "&").update(stringToSign).digest("base64");
+    params.Signature = sig;
+    const url = "https://nls-meta.cn-shanghai.aliyuncs.com/?" + new URLSearchParams(params).toString();
+    const resp = await fetch(url, { method: "POST" });
+    const data = await resp.json();
+    if (!data?.Token?.Id) throw new Error("nls token failed");
+    return data.Token.Id;
+  }
+
+  // 音頻 base64 → 轉寫文本(一句話識別極速版,同步)
+  async function transcribeAudio(audioB64) {
+    const token = await createNlsToken();
+    const appkey = process.env.ALIYUN_ISI_APPKEY;
+    if (!appkey) throw new Error("nls appkey missing");
+    const audio = Buffer.from(audioB64, "base64");
+    const qs = new URLSearchParams({ appkey, format: "wav", sample_rate: "16000" });
+    const resp = await fetch(`https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/asr?${qs}`, {
+      method: "POST",
+      headers: { "X-NLS-Token": token, "Content-Type": "application/octet-stream" },
+      body: audio,
+    });
+    const data = await resp.json();
+    if (data.status !== 20000000) throw new Error("nls asr failed: " + (data.message || data.status));
+    return data.result || "";
+  }
+
+  const callDashScope = async (prompt, retries = 2, useTextOnly = false) => {
+    // OpenAI 相容格式:圖片用 image_url,語音(未轉寫)用 input_audio,已轉寫 → 純文本
+    const content = useTextOnly
+      ? [{ type: "text", text: prompt }]
+      : audioBase64
+        ? [
+            { type: "text", text: prompt },
+            {
+              type: "input_audio",
+              input_audio: { data: audioBase64, format: (mimeType || "audio/wav").includes("mp4") ? "mp3" : "wav" },
+            },
+          ]
+        : [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
+          ];
+    console.error("verify-proof DashScope req:", JSON.stringify({ useTextOnly, hasAudio: !!audioBase64, promptLen: (prompt || "").length }).slice(0, 200));
     const gemRes = await fetch(DASHSCOPE_URL, {
       method: "POST",
       headers: {
@@ -134,7 +183,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: audioBase64 ? "qwen-audio-3.0-asr-flash" : "qwen3.8-max",
+        model: useTextOnly || !audioBase64 ? "qwen3.8-max" : "qwen-audio-3.0-asr-flash",
         messages: [{ role: "user", content }],
         max_tokens: 300,
       }),
@@ -146,7 +195,7 @@ export default async function handler(req, res) {
         await new Promise((r) => setTimeout(r, 3000));
         return callDashScope(prompt, retries - 1);
       }
-      console.error("verify-proof DashScope error:", gemRes.status, JSON.stringify(data).slice(0, 300));
+      console.error("verify-proof DashScope error:", gemRes.status, "BODY:", JSON.stringify(data).slice(0, 500));
       return null;
     }
     const text = data.choices?.[0]?.message?.content || "";
@@ -159,10 +208,35 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 雙重審核:兩次獨立調用,任一失敗/不通過 → 拒絕(音頻用宣誓證詞提示詞)
-    const [verdictA, verdictB] = await Promise.all(
-      audioBase64 ? [callDashScope(audioPromptA), callDashScope(audioPromptB)] : [callDashScope(promptA), callDashScope(promptB)]
-    );
+    // 語音:先轉寫再判斷文本;圖片:直接雙重審核
+    let transcript = "";
+    let promptUseA, promptUseB;
+    if (audioBase64) {
+      try {
+        transcript = await transcribeAudio(audioBase64);
+      } catch (e) {
+        console.error("verify-proof NLS error:", e.message);
+        return res.status(502).json({ aiAvailable: false, error: "nls upstream error" });
+      }
+      if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
+      // 用轉寫文本審核(替換提示詞的音頻描述為文本)
+      promptUseA = audioPromptA.replace(
+        "Listen to the audio and transcribe it.",
+        `The witness testified: "${transcript}"`
+      );
+      promptUseB = audioPromptB.replace(
+        `the user recorded "${name}" cancellation testimony. Be skeptical.`,
+        `The witness testified: "${transcript}".`
+      );
+    } else {
+      promptUseA = promptA;
+      promptUseB = promptB;
+    }
+    console.error("verify-proof prompts:", JSON.stringify({ a: (promptUseA || "").slice(0, 180), b: (promptUseB || "").slice(0, 180) }).slice(0, 500));
+    const [verdictA, verdictB] = await Promise.all([
+      callDashScope(promptUseA, 2, !!audioBase64),
+      callDashScope(promptUseB, 2, !!audioBase64),
+    ]);
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
     }
@@ -177,7 +251,7 @@ export default async function handler(req, res) {
         ? (verdictA.confidence === "high" && verdictB.confidence === "high" ? "high" : "medium")
         : "low",
       reason,
-      ...(audioBase64 && verdictA.transcript ? { transcript: verdictA.transcript } : {}),
+      ...(audioBase64 ? { transcript } : {}),
     });
   } catch (e) {
     console.error("verify-proof error:", e.message);
