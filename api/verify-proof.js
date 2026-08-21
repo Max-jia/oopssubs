@@ -2,7 +2,8 @@
 // 收截圖 + 訂閱資訊 → 交給 Gemini 審核 → 回傳結論
 // 鑰匙藏在伺服器環境變量 GEMINI_API_KEY，用戶端永遠看不到
 // Vercel serverless function：根目錄 api/ 會被 Vercel 當作獨立函數構建
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+// 百煉(DashScope)OpenAI 相容端點——一個 key 覆蓋圖片(qwen-vl)與語音(qwen-audio)
+const DASHSCOPE_URL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // base64 上限約 12MB（Gemini inline 上限 20MB）
 
 // 允許的來源：網站 + App WebView（capacitor://localhost）+ 本機開發
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
   if (!name || (!imageBase64 && !audioBase64)) return res.status(400).json({ error: "missing fields" });
   if ((imageBase64 || audioBase64).length > MAX_IMAGE_BYTES) return res.status(413).json({ error: "media too large" });
 
-  const key = process.env.GEMINI_API_KEY;
+  const key = process.env.DASHSCOPE_API_KEY || process.env.GEMINI_API_KEY;
   if (!key) return res.status(503).json({ aiAvailable: false, error: "ai not configured" });
 
   // 雙重審核:證明視角 + 反證視角(兩次獨立調用,任一不過即拒絕)
@@ -112,35 +113,43 @@ export default async function handler(req, res) {
     `PASS only if the service name and a clear cancellation statement are both clearly audible.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
-  const callGemini = async (prompt, retries = 2) => {
-    const gemRes = await fetch(GEMINI_URL, {
+  const callDashScope = async (prompt, retries = 2) => {
+    // OpenAI 相容格式:圖片用 image_url,語音用 input_audio
+    const content = audioBase64
+      ? [
+          { type: "text", text: prompt },
+          {
+            type: "input_audio",
+            input_audio: { data: audioBase64, format: (mimeType || "audio/wav").includes("mp4") ? "mp3" : "wav" },
+          },
+        ]
+      : [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${mimeType || "image/jpeg"};base64,${imageBase64}` } },
+        ];
+    const gemRes = await fetch(DASHSCOPE_URL, {
       method: "POST",
       headers: {
-        "x-goog-api-key": key,
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "Api-Revision": "2026-05-20",
       },
       body: JSON.stringify({
-        model: "gemini-3.5-flash",
-        input: [
-          { type: "text", text: prompt },
-          ...(audioBase64
-            ? [{ type: "audio", data: audioBase64, mime_type: mimeType || "audio/webm" }]
-            : [{ type: "image", data: imageBase64, mime_type: mimeType || "image/jpeg" }]),
-        ],
+        model: audioBase64 ? "qwen-audio-3.0-asr-flash" : "qwen3.8-max",
+        messages: [{ role: "user", content }],
+        max_tokens: 300,
       }),
     });
     const data = await gemRes.json();
     if (!gemRes.ok) {
-      // 429 配額超限:等待後重試(免費層分鐘級配額,稍等即恢復)
+      // 429 配額超限:等待後重試
       if (gemRes.status === 429 && retries > 0) {
         await new Promise((r) => setTimeout(r, 3000));
-        return callGemini(prompt, retries - 1);
+        return callDashScope(prompt, retries - 1);
       }
-      console.error("verify-proof Gemini error:", gemRes.status, JSON.stringify(data).slice(0, 300));
+      console.error("verify-proof DashScope error:", gemRes.status, JSON.stringify(data).slice(0, 300));
       return null;
     }
-    const text = extractOutputText(data);
+    const text = data.choices?.[0]?.message?.content || "";
     try {
       const v = JSON.parse(text.replace(/```json|```/g, "").trim());
       if (typeof v.passed === "boolean") return v;
@@ -152,7 +161,7 @@ export default async function handler(req, res) {
   try {
     // 雙重審核:兩次獨立調用,任一失敗/不通過 → 拒絕(音頻用宣誓證詞提示詞)
     const [verdictA, verdictB] = await Promise.all(
-      audioBase64 ? [callGemini(audioPromptA), callGemini(audioPromptB)] : [callGemini(promptA), callGemini(promptB)]
+      audioBase64 ? [callDashScope(audioPromptA), callDashScope(audioPromptB)] : [callDashScope(promptA), callDashScope(promptB)]
     );
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
