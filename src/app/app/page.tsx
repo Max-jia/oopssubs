@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getAppStoreSubscriptions, isMobileWeb } from "@/lib/app-store-scan";
 import { initPurchases, checkPro, buyPro, restorePro, isNativeApp, handleStripeReturn } from "@/lib/purchases";
 import { enableRipple } from "@/lib/ripple";
-import { drawShareCard, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
+import { drawShareCard, buildCaption, saveShareToPhotos, shareCardNative } from "@/lib/share-card";
+import type { ShareData } from "@/lib/share-card";
 import { cancelGuides } from "@/data/cancel-guides";
 import { Browser } from "@capacitor/browser";
 import { App as CapApp } from "@capacitor/app";
@@ -1146,6 +1147,10 @@ export default function AppPage() {
   const [shareImg, setShareImg] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareSaved, setShareSaved] = useState<string | null>(null);
+  const [shareRatio, setShareRatio] = useState<"4:5" | "1:1">("4:5");
+  const [shareData, setShareData] = useState<ShareData | null>(null);
+  const [shareCaption, setShareCaption] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
   // 首次看到列表時,第一行自動演示一次左滑教學
   // 全局錯誤捕獲:崩潰時把具體錯誤顯示在畫面上(用戶可原文回報,協助遠端排查)
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -1925,12 +1930,15 @@ export default function AppPage() {
               onClick={async () => {
                 if (shareBusy) return;
                 setShareBusy(true);
-                const url = await drawShareCard({
+                const data: ShareData = {
                   cases: detective.cases,
                   streak: detective.streak,
                   recovered: lifetimeSavings(),
                   closed: getCancelled().map(c => ({ name: c.name, amount: c.amount, cycle: c.cycle })),
-                });
+                };
+                setShareData(data);
+                setShareCaption(buildCaption(data));
+                const url = await drawShareCard(data, { ratio: shareRatio });
                 setShareBusy(false);
                 if (url) setShareImg(url);
               }}
@@ -2677,6 +2685,45 @@ export default function AppPage() {
                 exit={{ scale: 0.85, opacity: 0 }}
               >
                 <img src={shareImg} alt="Your detective case report" className="w-full rounded-2xl shadow-2xl" />
+                {/* 格式切換:換格式重新生成(資料已在 shareData) */}
+                <div className="flex justify-center gap-2 mt-3">
+                  {(["4:5", "1:1"] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={async () => {
+                        if (shareBusy || !shareData) return;
+                        setShareRatio(r);
+                        setShareBusy(true);
+                        const url = await drawShareCard(shareData, { ratio: r });
+                        setShareBusy(false);
+                        if (url) setShareImg(url);
+                      }}
+                      className={`text-[12px] font-semibold px-4 py-1.5 rounded-full transition-colors ${
+                        shareRatio === r
+                          ? "bg-[var(--brand)] text-[var(--bg)]"
+                          : "bg-black/40 text-[var(--text-secondary)] border border-white/10"
+                      }`}
+                    >
+                      {r} {shareBusy ? "…" : ""}
+                    </button>
+                  ))}
+                </div>
+                {/* 社交台詞:一鍵複製 */}
+                <div className="mt-3 rounded-xl bg-black/40 border border-white/10 px-3 py-2.5">
+                  <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">{shareCaption}</p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(shareCaption);
+                        setShareCopied(true);
+                        setTimeout(() => setShareCopied(false), 2000);
+                      } catch { /* 剪貼簿不可用時忽略 */ }
+                    }}
+                    className="mt-1 text-[12px] font-semibold text-[var(--brand)]"
+                  >
+                    {shareCopied ? "Copied ✓" : "Copy caption"}
+                  </button>
+                </div>
                 <div className="flex gap-2 mt-4">
                   <button
                     onClick={async () => {
@@ -2703,14 +2750,14 @@ export default function AppPage() {
                     onClick={async () => {
                       try {
                         if (isNativeApp()) {
-                          // App 內:原生分享面板(先寫暫存檔)
-                          await shareCardNative(shareImg);
+                          // App 內:原生分享面板(先寫暫存檔,帶社交台詞)
+                          await shareCardNative(shareImg, shareCaption);
                         } else {
-                          // 網站版:Web Share API(帶圖片檔案)
+                          // 網站版:Web Share API(帶圖片檔案 + 台詞)
                           const blob = await (await fetch(shareImg)).blob();
                           const file = new File([blob], "oopssubs-case-report.png", { type: "image/png" });
                           if (navigator.share) {
-                            await navigator.share({ files: [file], title: "OopsSubs case report" });
+                            await navigator.share({ files: [file], text: shareCaption, title: "OopsSubs case report" });
                           }
                         }
                       } catch { /* 用戶取消 */ }
