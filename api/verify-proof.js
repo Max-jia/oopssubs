@@ -108,9 +108,8 @@ export default async function handler(req, res) {
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
 
   const audioPromptB =
-    `You are an adversarial second reviewer for the same claim: the user recorded "${name}" cancellation testimony. Be skeptical.\n` +
-    `Find ANY reason the testimony is unreliable: the service name is missing, no clear cancellation statement, or the speech is unintelligible due to noise. Do NOT fail for being brief — a short clear statement is valid testimony. If unsure, FAIL.\n` +
-    `PASS only if the service name and a clear cancellation statement are both clearly audible (accept "cancel", "cancelled", "canceled", "ended", "stopped").\n` +
+    `You are an adversarial second reviewer. The first reviewer already confirmed the service name "${name}" matches the testimony. Your ONLY job: is the cancellation statement credible? Be skeptical but fair.\n` +
+    `FAIL only if there is genuinely no cancellation statement at all. Do NOT fail for briefness, casual spoken grammar, transcription imperfections, or service-name phrasing — "i have canceled", "i cancel", "i canceled", "i ended", "i stopped" are all valid. If unsure, FAIL.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
   // ── 阿里雲 NLS 一句話識別(極速版):同步轉寫語音 ──
