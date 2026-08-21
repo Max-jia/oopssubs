@@ -83,7 +83,7 @@ export default function HomePage() {
         </motion.div>
         <div className="relative mb-3 h-[72px]">
         <motion.div
-          className="relative inline-block"
+          className="relative block w-full"
           initial={{ y: 16 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
