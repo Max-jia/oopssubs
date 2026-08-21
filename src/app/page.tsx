@@ -40,28 +40,13 @@ export default function HomePage() {
   const [closedCases, setClosedCases] = useState<{ name: string; amount: number; cycle: string; date: string }[]>([]);
   const [detectiveCases, setDetectiveCases] = useState(0);
   const [taglineDone, setTaglineDone] = useState(false);
-  const [taglineLeft, setTaglineLeft] = useState(0);
   const [subtitleDone, setSubtitleDone] = useState(false);
   useEffect(() => { enableRipple();
     setIsNative(isNativeApp());
     setClosedCases(getClosedCases().slice(-5).reverse());
     setDetectiveCases(getDetectiveCases());
   }, []);
-  // 測量「Some」文字左邊緣,讓 CLOSED CASES 標題與大標題對齊
-  useEffect(() => {
-    if (!taglineDone) return;
-    const h1 = document.querySelector("h1");
-    if (!h1) return;
-    try {
-      const first = h1.firstChild;
-      if (!first || !first.textContent?.trim()) return;
-      const range = document.createRange();
-      range.setStart(first, 0);
-      range.setEnd(first, Math.min(4, first.textContent.length));
-      const rect = range.getBoundingClientRect();
-      setTaglineLeft(Math.max(0, Math.round(rect.x - 24)));
-    } catch { /* 測量失敗用默認 */ }
-  }, [taglineDone]);
+
   return (
     <main className="min-h-screen notebook-grid animate-fade-in overflow-x-hidden">
       {/* 結尾:有破案紀錄的用戶,CONFIDENTIAL 章蓋下落款;新用戶沒有案子,不蓋 */}
@@ -163,7 +148,7 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3" style={{ marginLeft: taglineLeft }}>Closed cases</p>
+          <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1">Closed cases</p>
           <div className="relative">
             <span className="evidence-sweep" />
             <div className={closedCases.length <= 2 ? "flex gap-3 pb-2 px-1 snap-x justify-center" : "flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x"}>
