@@ -88,7 +88,7 @@ export default function HomePage() {
           animate={{ y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
         >
-          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-left">
+          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-center">
             {taglineDone ? (
               <>
                 Some subscriptions are<br />
@@ -148,7 +148,7 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1">Closed cases</p>
+          <p className="text-[11px] font-black tracking-[0.14em] text-[var(--text-tertiary)] uppercase mb-3 px-1 text-center">Closed cases</p>
           <div className="relative">
             <span className="evidence-sweep" />
             <div className={closedCases.length <= 2 ? "flex gap-3 pb-2 px-1 snap-x justify-center" : "flex gap-3 overflow-x-auto pb-2 px-1 -mx-6 px-6 snap-x"}>
