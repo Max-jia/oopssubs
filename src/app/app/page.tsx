@@ -126,6 +126,50 @@ function proofDays(p: PendingProof): number {
 }
 
 /* 截圖壓縮：最長邊 1200px、JPEG 0.85——一張截圖 ~200KB，不會吃光手機空間 */
+// Gemini 不支援 audio/webm(支援 wav/mp3/aac/ogg/flac)——錄音轉成 16kHz 單聲道 WAV
+async function webmToWavDataUrl(blob: Blob): Promise<string> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const ctx = new AudioContext();
+  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+  const channels = 1;
+  const sampleRate = 16000;
+  const offline = new OfflineAudioContext(channels, Math.ceil(audioBuffer.duration * sampleRate), sampleRate);
+  const source = offline.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offline.destination);
+  const rendered = await offline.startRendering();
+  // 編碼 WAV(16-bit PCM)
+  const data = rendered.getChannelData(0);
+  const buffer = new ArrayBuffer(44 + data.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (off: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + data.length * 2, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * channels * 2, true);
+  view.setUint16(32, channels * 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, data.length * 2, true);
+  for (let i = 0; i < data.length; i++) {
+    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 0x7fff, true);
+  }
+  const wavBlob = new Blob([buffer], { type: "audio/wav" });
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("wav encode failed"));
+    reader.readAsDataURL(wavBlob);
+  });
+}
+
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -1530,15 +1574,18 @@ export default function AppPage() {
       const rec = new MediaRecorder(stream);
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      rec.onstop = () => {
+      rec.onstop = async () => {
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setAudioUrl(reader.result as string);
-          setProof(p => (p ? { ...p, audio: reader.result as string, isAudio: true } : p));
-        };
-        reader.readAsDataURL(blob);
         stream.getTracks().forEach((t) => t.stop());
+        try {
+          // Gemini 不支援 webm——轉 16kHz WAV
+          const dataUrl = await webmToWavDataUrl(blob);
+          setAudioUrl(dataUrl);
+          setProof(p => (p ? { ...p, audio: dataUrl, isAudio: true } : p));
+        } catch {
+          setError("Audio conversion failed. Try again or use a screenshot.");
+          setTimeout(() => setError(""), 4000);
+        }
       };
       rec.start();
       recorderRef.current = rec;
