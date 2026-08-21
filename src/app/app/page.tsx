@@ -163,7 +163,25 @@ const DETECTIVE_LINES_FAIL = [
   "Evidence rejected. I need the cancellation page.",
   "Hmm… this proves nothing. Try again.",
 ];
-function pickDetectiveLine(pass: boolean, name: string): string {
+const AUDIO_LINES_PASS = [
+  "The court accepts your testimony.",
+  "Your words ring true. Case closed.",
+  "The witness spoke clearly. Accepted.",
+  "This testimony holds up in court.",
+  "Clear words. Honest voice. Case closed.",
+];
+const AUDIO_LINES_FAIL = [
+  "The court rejects this testimony. Speak more clearly.",
+  "I can't hear a clear cancellation. Try again.",
+  "This testimony is not convincing.",
+  "The witness is unclear. The court needs better words.",
+  "That's not a clear confession. Try again.",
+];
+function pickDetectiveLine(pass: boolean, name: string, isAudio = false): string {
+  if (isAudio) {
+    const pool = pass ? AUDIO_LINES_PASS : AUDIO_LINES_FAIL;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
   const pool = pass ? DETECTIVE_LINES_PASS : DETECTIVE_LINES_FAIL;
   return pool[Math.floor(Math.random() * pool.length)].replace("{name}", name);
 }
@@ -1491,7 +1509,7 @@ export default function AppPage() {
       setProof(p => (p ? { ...p, image: dataUrl, stage: "reviewing", verdict: null, aiError: false } : p));
       try {
         const verdict = await callVerifyProof(proof.sub, dataUrl);
-        setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+        setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name, p.isAudio), stage: "result" } : p));
       } catch {
         setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
       }
@@ -1544,7 +1562,7 @@ export default function AppPage() {
     setProof(p => (p ? { ...p, stage: "reviewing", verdict: null, aiError: false } : p));
     try {
       const verdict = await callVerifyProof(proof.sub, proof.audio, true);
-      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name, p.isAudio), stage: "result" } : p));
     } catch {
       setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
     }
@@ -1556,7 +1574,7 @@ export default function AppPage() {
     setProof(p => (p ? { ...p, stage: "reviewing", verdict: null, aiError: false } : p));
     try {
       const verdict = await callVerifyProof(proof.sub, proof.image);
-      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name), stage: "result" } : p));
+      setProof(p => (p ? { ...p, verdict, aiError: false, line: pickDetectiveLine(verdict.passed, p.sub.name, p.isAudio), stage: "result" } : p));
     } catch {
       setProof(p => (p ? { ...p, aiError: true, line: "", stage: "result" } : p));
     }
@@ -2391,7 +2409,7 @@ export default function AppPage() {
                         {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
-                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-8 py-3 text-[22px] font-black tracking-[0.2em] rotate-[8deg] bg-[var(--red-dim)]/50"
+                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-6 py-3 text-[20px] font-black tracking-[0.15em] rotate-[8deg] bg-[var(--red-dim)]/50"
                             initial={{ scale: 2.5, opacity: 0, rotate: 14 }}
                             animate={{ scale: 1, opacity: 1, rotate: 8 }}
                             transition={{ type: "spring", stiffness: 400, damping: 14 }}
