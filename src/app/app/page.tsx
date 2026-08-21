@@ -2260,9 +2260,14 @@ export default function AppPage() {
                     )}
                     {!recording ? (
                       audioUrl ? (
-                        <button onClick={submitAudio} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
-                          Submit testimony
-                        </button>
+                        <>
+                          <button onClick={submitAudio} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
+                            Submit testimony
+                          </button>
+                          <button onClick={() => setAudioUrl(null)} className="btn-secondary text-[16px] py-4 w-full mb-3">
+                            Record again
+                          </button>
+                        </>
                       ) : (
                         <button onClick={startRecording} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
                           <span className="w-3 h-3 rounded-full bg-[var(--red)] inline-block mr-2" />
@@ -2386,7 +2391,7 @@ export default function AppPage() {
                         {proof.image && <img src={proof.image} alt="Evidence" className="w-full max-h-80 object-contain rounded-xl bg-[var(--bg-elevated)]" />}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <motion.div
-                            className="border-[4px] border-[var(--red)] text-[var(--red)] rounded-xl px-8 py-3 text-[18px] font-black tracking-[0.08em] rotate-[8deg] bg-[var(--red-dim)]/50"
+                            className="border-[5px] border-[var(--red)] text-[var(--red)] rounded-xl px-8 py-3 text-[22px] font-black tracking-[0.2em] rotate-[8deg] bg-[var(--red-dim)]/50"
                             initial={{ scale: 2.5, opacity: 0, rotate: 14 }}
                             animate={{ scale: 1, opacity: 1, rotate: 8 }}
                             transition={{ type: "spring", stiffness: 400, damping: 14 }}
@@ -2402,7 +2407,7 @@ export default function AppPage() {
                           <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
                       </div>
-                      <button onClick={() => setProof(p => (p ? { ...p, stage: p.isAudio ? "audio" : "select", verdict: null, aiError: false, line: "", image: null, audio: null } : p))} className="btn-secondary text-[16px] py-4 w-full mb-3">
+                      <button onClick={() => { setAudioUrl(null); setProof(p => (p ? { ...p, stage: p.isAudio ? "audio" : "select", verdict: null, aiError: false, line: "", image: null, audio: null } : p)); }} className="btn-secondary text-[16px] py-4 w-full mb-3">
                         {proof.isAudio ? "Record again" : "Choose another screenshot"}
                       </button>
                       <p className="text-[12px] text-[var(--text-tertiary)] text-center">
