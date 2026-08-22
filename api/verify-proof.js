@@ -141,7 +141,24 @@ export default async function handler(req, res) {
     return data.Token.Id;
   }
 
-  // 音頻 base64 → 轉寫文本(一句話識別極速版,同步)
+  // 音頻 base64 → 轉寫文本(qwen3-asr-flash 高精度;NLS 降級備援)
+  async function transcribeWithQwen(audioB64, mime) {
+    const dataUrl = `data:${mime || "audio/wav"};base64,${audioB64}`;
+    const res = await fetch(DASHSCOPE_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen3-asr-flash",
+        messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl } }] }],
+        max_tokens: 300,
+        asr_options: { enable_itn: true },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error("qwen asr failed: " + (data?.message || res.status));
+    return data.choices?.[0]?.message?.content || "";
+  }
+
   async function transcribeAudio(audioB64) {
     const token = await createNlsToken();
     const appkey = process.env.ALIYUN_ISI_APPKEY;
@@ -208,34 +225,40 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 語音:A 審直接聽原始音頻(qwen-audio,不受 ASR 轉寫錯誤影響);B 審用 NLS 轉寫文本
+    // 語音:qwen3-asr-flash 高精度轉寫 → 文本雙審;NLS 降級備援
     // 圖片:直接雙重審核
     let transcript = "";
     let promptUseA, promptUseB;
     if (audioBase64) {
       try {
-        transcript = await transcribeAudio(audioBase64);
+        transcript = await transcribeWithQwen(audioBase64, mimeType);
       } catch (e) {
-        console.error("verify-proof NLS error:", e.message);
-        transcript = "";
+        console.error("verify-proof qwen-asr error:", e.message);
+        try {
+          transcript = await transcribeAudio(audioBase64);
+        } catch (e2) {
+          console.error("verify-proof NLS error:", e2.message);
+          transcript = "";
+        }
       }
-      // A 審:原始音頻提示詞(含「Listen to the audio」),直接聽
-      promptUseA = audioPromptA;
-      // B 審:有轉寫用文本(快),否則也聽音頻
-      promptUseB = transcript
-        ? audioPromptB.replace(
-            "Your ONLY job: is the cancellation statement credible?",
-            `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
-          )
-        : audioPromptB;
+      if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
+      // 用轉寫文本審核(替換提示詞的音頻描述為文本)
+      promptUseA = audioPromptA.replace(
+        "Listen to the audio and transcribe it.",
+        `The witness testified: "${transcript}"`
+      );
+      promptUseB = audioPromptB.replace(
+        "Your ONLY job: is the cancellation statement credible?",
+        `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
+      );
     } else {
       promptUseA = promptA;
       promptUseB = promptB;
     }
     console.error("verify-proof prompts:", JSON.stringify({ a: (promptUseA || "").slice(0, 180), b: (promptUseB || "").slice(0, 180) }).slice(0, 500));
     const [verdictA, verdictB] = await Promise.all([
-      callDashScope(promptUseA, 2, !!audioBase64 ? false : true),
-      callDashScope(promptUseB, 2, !audioBase64 || !!transcript),
+      callDashScope(promptUseA, 2, true),
+      callDashScope(promptUseB, 2, true),
     ]);
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
