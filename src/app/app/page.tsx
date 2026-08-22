@@ -680,6 +680,17 @@ const knownSenders: Record<string, string> = {
   'myfitnesspal': 'MyFitnessPal', 'strava': 'Strava', 'fitbit': 'Fitbit',
   'audible': 'Audible', 'kindle': 'Kindle Unlimited',
 };
+    // 品牌名正規化:AI/From header 常帶多餘後綴(DuolingoU、Netflix Inc),已知品牌一律換官方名
+    const brandName = (raw: string): string | null => {
+      const lower = raw.toLowerCase();
+      for (const [key, name] of Object.entries(knownSenders)) {
+        if (key.length >= 3 && lower.includes(key)) return name;
+      }
+      for (const [pattern, name] of KNOWN_SERVICES) {
+        if (pattern.test(raw)) return name;
+      }
+      return null;
+    };
 /* ── V2: Sender domain matching against known services ── */
 function matchSenderDomain(fromHeader: string): string | null {
   // Extract domain: either "name@domain.com" format, or just "domain.com"
@@ -849,17 +860,6 @@ ${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
     const text = data.choices?.[0]?.message?.content || "[]";
     const cleaned = text.replace(/```(?:json)?\s*|\s*```/g, "").trim();
     let aiResults: ScannedSub[] = JSON.parse(cleaned);
-    // 品牌名正規化:AI/From header 常帶多餘後綴(DuolingoU、Netflix Inc),已知品牌一律換官方名
-    const brandName = (raw: string): string | null => {
-      const lower = raw.toLowerCase();
-      for (const [key, name] of Object.entries(knownSenders)) {
-        if (key.length >= 3 && lower.includes(key)) return name;
-      }
-      for (const [pattern, name] of KNOWN_SERVICES) {
-        if (pattern.test(raw)) return name;
-      }
-      return null;
-    };
     // Post-process: fix generic names and missing amounts from email data
     aiResults = aiResults.map((s: ScannedSub) => {
       const fixed = brandName(s.name);
@@ -1973,7 +1973,8 @@ export default function AppPage() {
                   cases: detective.cases,
                   streak: detective.streak,
                   recovered: lifetimeSavings(),
-                  closed: getCancelled().map(c => ({ name: c.name, amount: c.amount, cycle: c.cycle })),
+                  // 分享卡上名字一律過品牌正規化(存量手動添加/舊掃描的怪拼寫也能洗乾淨)
+                  closed: getCancelled().map(c => ({ name: brandName(c.name) || c.name, amount: c.amount, cycle: c.cycle })),
                 };
                 setShareData(data);
                 setShareCaption(buildCaption(data));

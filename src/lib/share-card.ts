@@ -178,8 +178,9 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   }
 
   // 還有 N 個沒列出(金額邏輯閉環)
-  // 列表行數不足 3 時,下方整塊上移(不預留固定高度 → 不會中間一大片空白)
+  // 列表行數不足 3 時,9 MORE 跟列表上移;品牌區(QR/OopSubs/鉤子)4:5 跟上、1:1 固定貼底
   const lift = (3 - closed.length) * 100 * s;
+  const bottomLift = ratio === "1:1" ? 0 : lift;
   if (more > 0) {
     ctx.fillStyle = "#98989F";
     ctx.font = `700 ${20 * s}px -apple-system, sans-serif`;
@@ -214,7 +215,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
     const q = new Image();
     await new Promise<void>((res, rej) => { q.onload = () => res(); q.onerror = () => rej(); q.src = qr; });
     const size = 80 * s;
-    const qx = 64 * s, qy = 1174 * s - lift;
+    const qx = 64 * s, qy = 1174 * s - bottomLift;
     // 金框 + 光暈:黑底上讓 QR 跳出來(轉化入口)
     ctx.save();
     ctx.shadowColor = "rgba(255,179,64,0.55)";
@@ -239,10 +240,10 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   ctx.textAlign = "center";
   ctx.fillStyle = "#FFB340";
   ctx.font = `800 ${26 * s}px -apple-system, sans-serif`;
-  ctx.fillText("OopSubs", W / 2, 1210 * s - lift);
+  ctx.fillText("OopSubs", W / 2, 1210 * s - bottomLift);
   ctx.fillStyle = "#98989F";
   ctx.font = `700 ${22 * s}px -apple-system, sans-serif`;
-  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s - lift);
+  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s - bottomLift);
 
   return canvas.toDataURL("image/png");
 }
@@ -250,7 +251,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
 // 社交台詞:生成卡片時同步備好,一鍵複製或帶入分享面板
 export function buildCaption(data: ShareData): string {
   const total = Math.round(data.recovered);
-  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting?`;
+  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting? 🕵️`;
 }
 
 // 分享卡先寫入暫存檔,返回 file:// URI(原生外掛對 data URI 不穩)
