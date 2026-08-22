@@ -1648,12 +1648,20 @@ export default function AppPage() {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  // 競態防護:startRecording 等麥克風權限時用戶已鬆開 → 啟動後立即放棄
+  const stopRequestedRef = useRef(false);
 
   const startRecording = useCallback(async () => {
     // 防重入:按住觸發多次時只開第一個
     if (recorderRef.current && recorderRef.current.state !== "inactive") return;
+    stopRequestedRef.current = false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 等權限期間用戶已鬆開 → 不啟動,直接丟棄
+      if (stopRequestedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       const rec = new MediaRecorder(stream);
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -1673,6 +1681,8 @@ export default function AppPage() {
       rec.start();
       recorderRef.current = rec;
       setRecording(true);
+      // 保險:最長錄 30 秒自動停,防任何情況下的卡死
+      setTimeout(() => { stopRecording(); }, 30000);
     } catch {
       setError("Microphone unavailable. Try the screenshot option instead.");
       setTimeout(() => setError(""), 4000);
@@ -1680,6 +1690,7 @@ export default function AppPage() {
   }, []);
 
   const stopRecording = useCallback(() => {
+    stopRequestedRef.current = true;
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
@@ -2435,7 +2446,11 @@ export default function AppPage() {
                         </>
                       ) : (
                         <button
-                          onPointerDown={startRecording}
+                          onPointerDown={(e) => {
+                            // 鎖定指針:按下後即使滑出按鈕,鬆開也保證回到這裡觸發停止
+                            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 已釋放 */ }
+                            startRecording();
+                          }}
                           onPointerUp={stopRecording}
                           onPointerLeave={stopRecording}
                           onPointerCancel={stopRecording}
