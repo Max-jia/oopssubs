@@ -208,7 +208,8 @@ export default async function handler(req, res) {
   };
 
   try {
-    // 語音:先轉寫再判斷文本;圖片:直接雙重審核
+    // 語音:A 審直接聽原始音頻(qwen-audio,不受 ASR 轉寫錯誤影響);B 審用 NLS 轉寫文本
+    // 圖片:直接雙重審核
     let transcript = "";
     let promptUseA, promptUseB;
     if (audioBase64) {
@@ -216,26 +217,25 @@ export default async function handler(req, res) {
         transcript = await transcribeAudio(audioBase64);
       } catch (e) {
         console.error("verify-proof NLS error:", e.message);
-        return res.status(502).json({ aiAvailable: false, error: "nls upstream error" });
+        transcript = "";
       }
-      if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
-      // 用轉寫文本審核(替換提示詞的音頻描述為文本)
-      promptUseA = audioPromptA.replace(
-        "Listen to the audio and transcribe it.",
-        `The witness testified: "${transcript}"`
-      );
-      promptUseB = audioPromptB.replace(
-        "Your ONLY job: is the cancellation statement credible?",
-        `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
-      );
+      // A 審:原始音頻提示詞(含「Listen to the audio」),直接聽
+      promptUseA = audioPromptA;
+      // B 審:有轉寫用文本(快),否則也聽音頻
+      promptUseB = transcript
+        ? audioPromptB.replace(
+            "Your ONLY job: is the cancellation statement credible?",
+            `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
+          )
+        : audioPromptB;
     } else {
       promptUseA = promptA;
       promptUseB = promptB;
     }
     console.error("verify-proof prompts:", JSON.stringify({ a: (promptUseA || "").slice(0, 180), b: (promptUseB || "").slice(0, 180) }).slice(0, 500));
     const [verdictA, verdictB] = await Promise.all([
-      callDashScope(promptUseA, 2, !!audioBase64),
-      callDashScope(promptUseB, 2, !!audioBase64),
+      callDashScope(promptUseA, 2, !!audioBase64 ? false : true),
+      callDashScope(promptUseB, 2, !audioBase64 || !!transcript),
     ]);
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });

@@ -2499,7 +2499,8 @@ export default function AppPage() {
                       </svg>
                     </div>
                     <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">The detective wants an encore</h3>
-                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-6 max-w-[300px] mx-auto italic">"{proof.line}"</p>
+                    <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-2 max-w-[300px] mx-auto italic">"{proof.line}"</p>
+                    <p className="text-[12px] text-[var(--text-tertiary)] mb-6">Say clearly: "I cancelled {proof.sub.name}"</p>
                     <button onClick={() => { setAudioUrl(null); setProof(p => (p ? { ...p, stage: "audio", verdict: null, aiError: false, line: "", audio: null } : p)); }} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
                       Record again
                     </button>
