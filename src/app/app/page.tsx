@@ -2434,8 +2434,7 @@ export default function AppPage() {
                         )}
                       </div>
                     )}
-                    {!recording ? (
-                      audioUrl ? (
+                    {audioUrl ? (
                         <>
                           <button onClick={submitAudio} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
                             Submit testimony
@@ -2445,24 +2444,31 @@ export default function AppPage() {
                           </button>
                         </>
                       ) : (
-                        <button
-                          onPointerDown={(e) => {
-                            // 鎖定指針:按下後即使滑出按鈕,鬆開也保證回到這裡觸發停止
-                            try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 已釋放 */ }
-                            startRecording();
-                          }}
-                          onPointerUp={stopRecording}
-                          onPointerLeave={stopRecording}
-                          onPointerCancel={stopRecording}
-                          className="btn-primary text-[16px] font-semibold py-4 w-full mb-3 active:scale-[0.98] select-none"
-                        >
-                          <span className={`w-3 h-3 rounded-full inline-block mr-2 ${recording ? "bg-[var(--red)] animate-pulse" : "bg-[var(--red)] opacity-60"}`} />
-                          {recording ? "Recording… release to stop" : "Hold to record"}
-                        </button>
+                        <>
+                          {/* 主按鈕永遠不換 DOM(換了 pointer capture 會失效,鬆開就丟失) */}
+                          <button
+                            onPointerDown={(e) => {
+                              // 鎖定指針:按下後即使滑出按鈕,鬆開也保證回到這裡觸發停止
+                              try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 已釋放 */ }
+                              startRecording();
+                            }}
+                            onPointerUp={stopRecording}
+                            onPointerLeave={stopRecording}
+                            onPointerCancel={stopRecording}
+                            className="btn-primary text-[16px] font-semibold py-4 w-full mb-3 active:scale-[0.98] select-none"
+                          >
+                            <span className={`w-3 h-3 rounded-full inline-block mr-2 ${recording ? "bg-[var(--red)] animate-pulse" : "bg-[var(--red)] opacity-60"}`} />
+                            {recording ? "Recording… release to stop" : "Hold to record"}
+                          </button>
+                          {/* 逃生門:任何 pointer 事件丟失時,點擊也能停 */}
+                          {recording && (
+                            <button onClick={stopRecording} className="btn-secondary text-[14px] py-2.5 w-full mb-3">
+                              Stop recording
+                            </button>
+                          )}
+                        </>
                       )
-                    ) : (
-                      <></>
-                    )}
+                    }
                     <button onClick={() => setProof(p => (p ? { ...p, stage: "select" } : p))} className="text-[13px] text-[var(--text-secondary)] underline">
                       Back to options
                     </button>
