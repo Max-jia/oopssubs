@@ -1650,6 +1650,8 @@ export default function AppPage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
 
   const startRecording = useCallback(async () => {
+    // 防重入:按住觸發多次時只開第一個
+    if (recorderRef.current && recorderRef.current.state !== "inactive") return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
@@ -2432,15 +2434,19 @@ export default function AppPage() {
                           </button>
                         </>
                       ) : (
-                        <button onClick={startRecording} className="btn-primary text-[16px] font-semibold py-4 w-full mb-3">
-                          <span className="w-3 h-3 rounded-full bg-[var(--red)] inline-block mr-2" />
-                          Start recording
+                        <button
+                          onPointerDown={startRecording}
+                          onPointerUp={stopRecording}
+                          onPointerLeave={stopRecording}
+                          onPointerCancel={stopRecording}
+                          className="btn-primary text-[16px] font-semibold py-4 w-full mb-3 active:scale-[0.98] select-none"
+                        >
+                          <span className={`w-3 h-3 rounded-full inline-block mr-2 ${recording ? "bg-[var(--red)] animate-pulse" : "bg-[var(--red)] opacity-60"}`} />
+                          {recording ? "Recording… release to stop" : "Hold to record"}
                         </button>
                       )
                     ) : (
-                      <button onClick={stopRecording} className="btn-secondary text-[16px] py-4 w-full mb-3">
-                        Stop recording
-                      </button>
+                      <></>
                     )}
                     <button onClick={() => setProof(p => (p ? { ...p, stage: "select" } : p))} className="text-[13px] text-[var(--text-secondary)] underline">
                       Back to options
@@ -2560,12 +2566,6 @@ export default function AppPage() {
                       <div className="text-center">
                         <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Case closed</h3>
                         <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-2 max-w-[280px] mx-auto">{proof.line}</p>
-                        {proof.isAudio && proof.verdict.transcript && (
-                          <div className="card p-3 mb-3 text-left">
-                            <p className="text-[10px] font-black tracking-[0.12em] text-[var(--text-tertiary)] uppercase mb-1">Transcript</p>
-                            <p className="text-[13px] text-[var(--text)] italic">"{proof.verdict.transcript}"</p>
-                          </div>
-                        )}
                         {proof.verdict.reason && (
                           <p className="text-[12px] text-[var(--text-tertiary)] italic mb-7 max-w-[280px] mx-auto">— {proof.verdict.reason}</p>
                         )}
