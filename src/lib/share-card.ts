@@ -68,7 +68,8 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   }
   const closed = Array.from(merged.values()).sort((a, b) => b.amount - a.amount).slice(0, 3);
   const shown = closed.length;
-  const more = Math.max(0, data.cases - shown);
+  // 誠實算法:還有 N 個實際存在但沒畫出來的(不是拿歷史結案數充數)
+  const more = Math.max(0, merged.size - shown);
 
   // 背景:radial 深色
   const bg = ctx.createRadialGradient(W / 2, H * 0.18, 100 * s, W / 2, H / 2, H * 0.9);
@@ -151,12 +152,18 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   ctx.letterSpacing = "8px";
   ctx.fillText("/ YEAR FOUND", W / 2, 742 * s);
 
-  // ── Zone 3:證據列表(最多 3 行,同名合併) ──
-  let y = 806 * s;
+  // ── Zone 3:證據列表 ──
+  // 行數少於 3 時,空缺均勻分散:上間距 45% + 行高微增 10% + 下間距 45%(元素分散,不堆頂)
+  const rows = closed.length;
+  const gap = (3 - rows) * 100 * s;
+  const padTop = gap * 0.45;
+  const rowExtra = rows > 0 ? (gap * 0.1) / rows : 0;
+  let y = 806 * s + padTop;
   for (const c of closed) {
+    const rowH = 96 * s + rowExtra;
     const label = c.count > 1 ? `${c.name} ×${c.count}` : c.name;
     ctx.save();
-    roundRect(ctx, 120 * s, y, W - 240 * s, 88 * s, 14 * s);
+    roundRect(ctx, 120 * s, y, W - 240 * s, rowH, 14 * s);
     ctx.fillStyle = "rgba(255,255,255,0.03)";
     ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
@@ -174,18 +181,16 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
     ctx.fillStyle = "#30D158";
     ctx.font = `700 ${26 * s}px -apple-system, sans-serif`;
     ctx.fillText(fmt(c.amount), W - 160 * s, y + 52 * s);
-    y += 100 * s;
+    y += rowH + 4 * s;
   }
+  const listEnd = y;
 
   // 還有 N 個沒列出(金額邏輯閉環)
-  // 列表行數不足 3 時,9 MORE 跟列表上移;品牌區(QR/OopSubs/鉤子)4:5 跟上、1:1 固定貼底
-  const lift = (3 - closed.length) * 100 * s;
-  const bottomLift = ratio === "1:1" ? 0 : lift;
   if (more > 0) {
     ctx.fillStyle = "#98989F";
     ctx.font = `700 ${20 * s}px -apple-system, sans-serif`;
     ctx.letterSpacing = "3px";
-    ctx.fillText(`${more} MORE SUBSCRIPTION${more > 1 ? "S" : ""}`, W / 2, 1136 * s - lift);
+    ctx.fillText(`${more} MORE SUBSCRIPTION${more > 1 ? "S" : ""}`, W / 2, listEnd + gap * 0.45 + 24 * s);
   }
 
   // CASE CLOSED 紅章:獨立裝飾徽章,蓋右上角空白(內移到金框內,預留安全邊距)
@@ -215,7 +220,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
     const q = new Image();
     await new Promise<void>((res, rej) => { q.onload = () => res(); q.onerror = () => rej(); q.src = qr; });
     const size = 80 * s;
-    const qx = 64 * s, qy = 1174 * s - bottomLift;
+    const qx = 64 * s, qy = 1174 * s;
     // 金框 + 光暈:黑底上讓 QR 跳出來(轉化入口)
     ctx.save();
     ctx.shadowColor = "rgba(255,179,64,0.55)";
@@ -240,10 +245,10 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   ctx.textAlign = "center";
   ctx.fillStyle = "#FFB340";
   ctx.font = `800 ${26 * s}px -apple-system, sans-serif`;
-  ctx.fillText("OopSubs", W / 2, 1210 * s - bottomLift);
+  ctx.fillText("OopSubs", W / 2, 1210 * s);
   ctx.fillStyle = "#98989F";
   ctx.font = `700 ${22 * s}px -apple-system, sans-serif`;
-  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s - bottomLift);
+  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s);
 
   return canvas.toDataURL("image/png");
 }
