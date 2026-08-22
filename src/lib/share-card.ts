@@ -251,7 +251,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
 // 社交台詞:生成卡片時同步備好,一鍵複製或帶入分享面板
 export function buildCaption(data: ShareData): string {
   const total = Math.round(data.recovered);
-  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting? 🕵️`;
+  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting? — OopSubs`;
 }
 
 // 分享卡先寫入暫存檔,返回 file:// URI(原生外掛對 data URI 不穩)
