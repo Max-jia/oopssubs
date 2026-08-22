@@ -225,8 +225,8 @@ export default async function handler(req, res) {
         `The witness testified: "${transcript}"`
       );
       promptUseB = audioPromptB.replace(
-        `the user recorded "${name}" cancellation testimony. Be skeptical.`,
-        `The witness testified: "${transcript}".`
+        "Your ONLY job: is the cancellation statement credible?",
+        `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
       );
     } else {
       promptUseA = promptA;

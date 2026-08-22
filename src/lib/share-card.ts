@@ -178,11 +178,13 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   }
 
   // 還有 N 個沒列出(金額邏輯閉環)
+  // 列表行數不足 3 時,下方整塊上移(不預留固定高度 → 不會中間一大片空白)
+  const lift = (3 - closed.length) * 100 * s;
   if (more > 0) {
     ctx.fillStyle = "#98989F";
     ctx.font = `700 ${20 * s}px -apple-system, sans-serif`;
     ctx.letterSpacing = "3px";
-    ctx.fillText(`${more} MORE SUBSCRIPTION${more > 1 ? "S" : ""}`, W / 2, 1136 * s);
+    ctx.fillText(`${more} MORE SUBSCRIPTION${more > 1 ? "S" : ""}`, W / 2, 1136 * s - lift);
   }
 
   // CASE CLOSED 紅章:獨立裝飾徽章,蓋右上角空白(內移到金框內,預留安全邊距)
@@ -212,7 +214,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
     const q = new Image();
     await new Promise<void>((res, rej) => { q.onload = () => res(); q.onerror = () => rej(); q.src = qr; });
     const size = 80 * s;
-    const qx = 64 * s, qy = 1174 * s;
+    const qx = 64 * s, qy = 1174 * s - lift;
     // 金框 + 光暈:黑底上讓 QR 跳出來(轉化入口)
     ctx.save();
     ctx.shadowColor = "rgba(255,179,64,0.55)";
@@ -237,10 +239,10 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
   ctx.textAlign = "center";
   ctx.fillStyle = "#FFB340";
   ctx.font = `800 ${26 * s}px -apple-system, sans-serif`;
-  ctx.fillText("OopSubs", W / 2, 1210 * s);
+  ctx.fillText("OopSubs", W / 2, 1210 * s - lift);
   ctx.fillStyle = "#98989F";
   ctx.font = `700 ${22 * s}px -apple-system, sans-serif`;
-  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s);
+  ctx.fillText("How much are yours costing you?", W / 2, 1258 * s - lift);
 
   return canvas.toDataURL("image/png");
 }
@@ -248,7 +250,7 @@ export async function drawShareCard(data: ShareData, opts: ShareCardOptions = {}
 // 社交台詞:生成卡片時同步備好,一鍵複製或帶入分享面板
 export function buildCaption(data: ShareData): string {
   const total = Math.round(data.recovered);
-  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting? 👀`;
+  return `I just found ${fmt(total)}/year in subscriptions I forgot about. How much are you wasting?`;
 }
 
 // 分享卡先寫入暫存檔,返回 file:// URI(原生外掛對 data URI 不穩)

@@ -654,6 +654,32 @@ const KNOWN_SERVICES: [RegExp, string, "monthly"|"yearly"][] = [
   [/nordvpn|expressvpn|surfshark|protonvpn/i, "VPN", "monthly"],
 ];
 
+
+// 已知發信網域 → 官方品牌名(掃描正規化共用:knownSenders + AI 後處理)
+const knownSenders: Record<string, string> = {
+  'netflix': 'Netflix', 'spotify': 'Spotify', 'hulu': 'Hulu', 'disneyplus': 'Disney+',
+  'youtube': 'YouTube Premium', 'amazon': 'Amazon', 'adobe': 'Adobe',
+  'apple': 'Apple', 'linkedin': 'LinkedIn', 'microsoft': 'Microsoft',
+  'dropbox': 'Dropbox', 'notion': 'Notion', 'evernote': 'Evernote',
+  'nytimes': 'NYT', 'wsj': 'WSJ', 'washingtonpost': 'Washington Post',
+  'hellofresh': 'HelloFresh', 'blueapron': 'Blue Apron', 'chegg': 'Chegg',
+  'coursera': 'Coursera', 'skillshare': 'Skillshare', 'duolingo': 'Duolingo',
+  'discord': 'Discord', 'patreon': 'Patreon', 'substack': 'Substack',
+  'xbox': 'Xbox', 'playstation': 'PlayStation', 'nintendo': 'Nintendo',
+  'siriusxm': 'SiriusXM', 'pandora': 'Pandora', 'tidal': 'Tidal',
+  'norton': 'Norton', 'mcafee': 'McAfee', 'expressvpn': 'ExpressVPN',
+  'nordvpn': 'NordVPN', 'surfshark': 'Surfshark',
+  'canva': 'Canva', 'grammarly': 'Grammarly', 'lastpass': 'LastPass',
+  '1password': '1Password', 'walmart': 'Walmart+', 'barkbox': 'BarkBox',
+  'masterclass': 'MasterClass', 'babbel': 'Babbel',
+  'medium': 'Medium', 'reddit': 'Reddit', 'twitch': 'Twitch',
+  'ea.com': 'EA Play', 'fubo': 'FuboTV', 'sling': 'Sling TV',
+  'starz': 'Starz', 'crunchyroll': 'Crunchyroll', 'peacock': 'Peacock',
+  'paramount': 'Paramount+', 'max.com': 'Max', 'onlyfans': 'OnlyFans',
+  'planetfitness': 'Planet Fitness', 'classpass': 'ClassPass',
+  'myfitnesspal': 'MyFitnessPal', 'strava': 'Strava', 'fitbit': 'Fitbit',
+  'audible': 'Audible', 'kindle': 'Kindle Unlimited',
+};
 /* ── V2: Sender domain matching against known services ── */
 function matchSenderDomain(fromHeader: string): string | null {
   // Extract domain: either "name@domain.com" format, or just "domain.com"
@@ -823,8 +849,21 @@ ${remaining.map((r: any) => r.text || r).join("\n\n===NEXT EMAIL===\n\n")}`;
     const text = data.choices?.[0]?.message?.content || "[]";
     const cleaned = text.replace(/```(?:json)?\s*|\s*```/g, "").trim();
     let aiResults: ScannedSub[] = JSON.parse(cleaned);
+    // 品牌名正規化:AI/From header 常帶多餘後綴(DuolingoU、Netflix Inc),已知品牌一律換官方名
+    const brandName = (raw: string): string | null => {
+      const lower = raw.toLowerCase();
+      for (const [key, name] of Object.entries(knownSenders)) {
+        if (key.length >= 3 && lower.includes(key)) return name;
+      }
+      for (const [pattern, name] of KNOWN_SERVICES) {
+        if (pattern.test(raw)) return name;
+      }
+      return null;
+    };
     // Post-process: fix generic names and missing amounts from email data
     aiResults = aiResults.map((s: ScannedSub) => {
+      const fixed = brandName(s.name);
+      if (fixed) s.name = fixed;
       const isGeneric = /subscription|unknown/i.test(s.name);
       if (isGeneric || s.amount === 0) {
         const allText = [...remaining.map((r: any) => r.text || r), ...bodies.map((b: any) => b.text || b)].join("\n");
