@@ -56,3 +56,4 @@ ui-review/
 
 # checkout-api 依賴
 checkout-api/node_modules/
+android/.next
