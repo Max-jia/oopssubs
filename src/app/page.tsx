@@ -186,7 +186,7 @@ export default function HomePage() {
                 </p>
                 <Link
                   href={appHref("manual", isNative)}
-                  className="inline-block text-[13px] font-semibold text-[var(--brand)] hover:text-[var(--brand-strong)] transition-colors"
+                  className="inline-flex items-center min-h-[44px] text-[13px] font-semibold text-[var(--brand)] hover:text-[var(--brand-strong)] transition-colors"
                 >
                   Open your first case →
                 </Link>
@@ -235,7 +235,7 @@ export default function HomePage() {
         </div>
         <motion.a
           href={appHref("list", isNative)}
-          className="block text-center text-[13px] text-[var(--text-secondary)] mt-5 hover:text-[var(--text)] transition-colors"
+          className="flex items-center justify-center min-h-[44px] text-center text-[13px] text-[var(--text-secondary)] mt-5 hover:text-[var(--text)] transition-colors"
           whileTap={{ scale: 0.95 }}
         >
           View my subscriptions →

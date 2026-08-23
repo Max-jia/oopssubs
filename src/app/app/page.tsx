@@ -2051,9 +2051,9 @@ export default function AppPage() {
             {!pro && (
               <span className="text-[12px] text-[var(--text-secondary)]">{subs.length}/{FREE_LIMIT} free</span>
             )}
-            {!pro && <Link href="/pricing" className="text-[12px] font-semibold text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
+            {!pro && <Link href="/pricing" className="inline-flex items-center min-h-[44px] text-[12px] font-semibold text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
             {pro && <span className="text-[12px] font-semibold text-[var(--green)]">PRO</span>}
-            <button onClick={async () => { if (await openPaywallIfNeeded()) return; setShowAdd(true); }} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
+            <button onClick={async () => { if (await openPaywallIfNeeded()) return; setShowAdd(true); }} className="inline-flex items-center min-h-[44px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-200 text-[15px] font-medium px-4 py-2 rounded-full">
               + Add
             </button>
           </div>
