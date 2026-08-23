@@ -143,7 +143,8 @@ export default async function handler(req, res) {
     return data.Token.Id;
   }
 
-  // 音頻 base64 → 轉寫文本(qwen3-asr-flash 高精度;NLS 降級備援)
+  // 音頻 base64 → 轉寫文本(qwen-audio-3.0-asr-flash 高精度;NLS 降級備援)
+  // 注意:OpenAI 相容模式不認識 asr_options(那是原生 API 參數)→ 400。不放。
   async function transcribeWithQwen(audioB64, mime) {
     const dataUrl = `data:${mime || "audio/wav"};base64,${audioB64}`;
     const res = await fetch(DASHSCOPE_URL, {
@@ -151,9 +152,14 @@ export default async function handler(req, res) {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "qwen-audio-3.0-asr-flash",
-        messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl } }] }],
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Transcribe the audio verbatim. Output only the transcription." },
+            { type: "input_audio", input_audio: { data: dataUrl } },
+          ],
+        }],
         max_tokens: 300,
-        asr_options: { enable_itn: true },
       }),
     });
     const data = await res.json();
