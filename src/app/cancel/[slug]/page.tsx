@@ -71,7 +71,7 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
         <ol className="space-y-0">
           {guide.steps.map((step, i) => (
             <li key={i} className={`flex gap-4 ${i !== 0 ? 'pt-4' : ''} ${i !== guide.steps.length - 1 ? 'pb-4 border-b border-[var(--divider)]' : ''}`}>
-              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--text)] text-white text-[13px] flex items-center justify-center font-semibold mt-0.5">
+              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--text)] text-[var(--bg)] text-[13px] flex items-center justify-center font-semibold mt-0.5">
                 {i + 1}
               </span>
               <span className="text-[15px] text-[var(--text)] leading-relaxed pt-0.5">{step}</span>
