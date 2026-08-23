@@ -4,6 +4,8 @@
 // Vercel serverless function：根目錄 api/ 會被 Vercel 當作獨立函數構建
 // 百煉(DashScope)OpenAI 相容端點——一個 key 覆蓋圖片(qwen-vl)與語音(qwen-audio)
 const DASHSCOPE_URL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions";
+// qwen3-asr-flash 未在专属端点開通(404)——转写走官方通用端点,审核继续走专属端点
+const DASHSCOPE_PUBLIC_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // base64 上限約 12MB（Gemini inline 上限 20MB）
 
 // 允許的來源：網站 + App WebView（capacitor://localhost）+ 本機開發
@@ -144,7 +146,7 @@ export default async function handler(req, res) {
   // 音頻 base64 → 轉寫文本(qwen3-asr-flash 高精度;NLS 降級備援)
   async function transcribeWithQwen(audioB64, mime) {
     const dataUrl = `data:${mime || "audio/wav"};base64,${audioB64}`;
-    const res = await fetch(DASHSCOPE_URL, {
+    const res = await fetch(DASHSCOPE_PUBLIC_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
