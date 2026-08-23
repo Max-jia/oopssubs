@@ -256,9 +256,10 @@ export default async function handler(req, res) {
       promptUseB = promptB;
     }
     console.error("verify-proof prompts:", JSON.stringify({ a: (promptUseA || "").slice(0, 180), b: (promptUseB || "").slice(0, 180) }).slice(0, 500));
+    // 圖片:送截圖給 AI 看(useTextOnly=false);錄音:已轉寫成文本,純文本審核
     const [verdictA, verdictB] = await Promise.all([
-      callDashScope(promptUseA, 2, true),
-      callDashScope(promptUseB, 2, true),
+      callDashScope(promptUseA, 2, !!audioBase64),
+      callDashScope(promptUseB, 2, !!audioBase64),
     ]);
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
