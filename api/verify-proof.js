@@ -146,11 +146,11 @@ export default async function handler(req, res) {
   // 音頻 base64 → 轉寫文本(qwen3-asr-flash 高精度;NLS 降級備援)
   async function transcribeWithQwen(audioB64, mime) {
     const dataUrl = `data:${mime || "audio/wav"};base64,${audioB64}`;
-    const res = await fetch(DASHSCOPE_PUBLIC_URL, {
+    const res = await fetch(DASHSCOPE_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "qwen3-asr-flash",
+        model: "qwen-audio-3.0-asr-flash",
         messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl } }] }],
         max_tokens: 300,
         asr_options: { enable_itn: true },
@@ -166,7 +166,7 @@ export default async function handler(req, res) {
     const appkey = process.env.ALIYUN_ISI_APPKEY;
     if (!appkey) throw new Error("nls appkey missing");
     const audio = Buffer.from(audioB64, "base64");
-    const qs = new URLSearchParams({ appkey, format: "wav", sample_rate: "16000" });
+    const qs = new URLSearchParams({ appkey, format: "wav", sample_rate: "16000", language_hints: "en" });
     const resp = await fetch(`https://nls-gateway-cn-shanghai.aliyuncs.com/stream/v1/asr?${qs}`, {
       method: "POST",
       headers: { "X-NLS-Token": token, "Content-Type": "application/octet-stream" },
