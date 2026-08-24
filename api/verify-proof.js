@@ -121,6 +121,7 @@ export default async function handler(req, res) {
     const n = (name || "").toLowerCase();
     if (!t || !n) return false;
     if (t.includes(n)) return true;
+    if (t.replace(/\s+/g, "").includes(n.replace(/\s+/g, ""))) return true; // "only fans" ≈ "onlyfans"
     const fold = (s) => s.replace(/[aeiou]/g, "0"); // 母音互換(accent)不計
     const key = n.split(/\s+/).filter(Boolean).length > 1 ? n.split(/\s+/)[0] : n; // 多字名看首詞
     if (key.length < 4) return t.split(/\W+/).includes(key);
@@ -319,12 +320,16 @@ export default async function handler(req, res) {
           transcript = await transcribeAudio(audioBase64);
         } catch (e3) {
           console.error("verify-proof NLS error:", e3.message);
-          try {
-            transcript = await transcribeWithGemini(audioBase64, mimeType, name);
-          } catch (e2) {
-            console.error("verify-proof gemini-asr error:", e2.message);
-            transcript = "";
-          }
+          transcript = "";
+        }
+      }
+      // 轉寫查無服務名(如 OnlyFans 被吞)→ Gemini 補轉一次,取有名字的那份
+      if (!transcript || !nameMatches(transcript, name)) {
+        try {
+          const gemTranscript = await transcribeWithGemini(audioBase64, mimeType, name);
+          if (gemTranscript && (!transcript || nameMatches(gemTranscript, name))) transcript = gemTranscript;
+        } catch (e2) {
+          console.error("verify-proof gemini-asr error:", e2.message);
         }
       }
       if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
