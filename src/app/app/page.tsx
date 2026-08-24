@@ -1057,6 +1057,7 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
           onClick={handleAddToCalendar}
           disabled={calBusy}
           className="text-[var(--text-tertiary)] hover:text-[var(--text)] transition-all duration-200 text-xs w-10 h-10 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center flex-shrink-0 disabled:opacity-50"
+          aria-label="Add to calendar"
           title="Add to calendar"
         >
           {calBusy ? (
@@ -1121,6 +1122,8 @@ function SwipeableRow({ index, last, hint, leaving, onHintShown, onCancel, child
       <div className="absolute inset-y-0 right-0 w-24 z-0 bg-[var(--red)] flex items-center justify-center">
         <button
           onClick={onCancel}
+          tabIndex={open ? 0 : -1}
+          aria-hidden={!open}
           className="text-[var(--bg)] text-[13px] font-semibold tracking-wide active:scale-95 transition-transform"
         >
           Cancel
@@ -1128,6 +1131,15 @@ function SwipeableRow({ index, last, hint, leaving, onHintShown, onCancel, child
       </div>
       <motion.div
         ref={rowRef}
+        tabIndex={0}
+        role="button"
+        aria-label="Press Delete or Backspace to cancel this subscription"
+        onKeyDown={(e) => {
+          if (e.key === "Backspace" || e.key === "Delete") {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
         initial={{ opacity: 0, x: -20 }}
         animate={{
           opacity: 1,
@@ -1369,10 +1381,20 @@ export default function AppPage() {
     }
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 通知權限只在用戶首次與頁面互動後才請求(瀏覽器會擋非手勢請求,掛載即彈也打斷首次體驗)
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "default") return;
+    const requestOnGesture = () => {
+      Notification.requestPermission().catch(() => { /* noop */ });
+      window.removeEventListener("pointerdown", requestOnGesture);
+      window.removeEventListener("keydown", requestOnGesture);
+    };
+    window.addEventListener("pointerdown", requestOnGesture);
+    window.addEventListener("keydown", requestOnGesture);
+    return () => {
+      window.removeEventListener("pointerdown", requestOnGesture);
+      window.removeEventListener("keydown", requestOnGesture);
+    };
   }, []);
 
   // ── V2: Auto background scan on app open ──
@@ -1915,7 +1937,7 @@ export default function AppPage() {
             >
               Cancel now
             </button>
-            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--text-tertiary)] hover:text-[var(--text)] text-lg w-10 h-10 inline-flex items-center justify-center flex-shrink-0">&times;</button>
+            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} aria-label="Dismiss urgent alert" className="text-[var(--text-tertiary)] hover:text-[var(--text)] text-lg w-10 h-10 inline-flex items-center justify-center flex-shrink-0">&times;</button>
           </div>
         </motion.div>
       ))}
@@ -2206,6 +2228,7 @@ export default function AppPage() {
                     <button
                       onClick={() => { buzz(10); dismissTrialAlert(); }}
                       className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-10 h-10 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center flex-shrink-0"
+                      aria-label="Close"
                     >&times;</button>
                   </div>
                   <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4">
@@ -2250,6 +2273,7 @@ export default function AppPage() {
                     <button
                       onClick={() => { setShowWeekly(false); localStorage.setItem("oopssubs_weekly_check", String(Date.now())); }}
                       className="flex-shrink-0 text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-10 h-10 inline-flex items-center justify-center"
+                      aria-label="Dismiss"
                     >&times;</button>
                   </div>
                 </motion.div>
@@ -2351,7 +2375,7 @@ export default function AppPage() {
           {proof && (
             <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col animate-fade-in">
               <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
-                <button onClick={closeProofFlow} className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
+                <button onClick={closeProofFlow} aria-label="Close" className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
                 <h2 className="text-[15px] font-semibold text-[var(--text)]">Cancel proof</h2>
                 <div className="w-9" />
               </div>
@@ -2727,7 +2751,7 @@ export default function AppPage() {
             >
               <div className="flex items-center justify-between px-6 pt-6 pb-3">
                 <p className="text-[14px] font-semibold text-[var(--bg)]">Proof — {proofViewer.name}</p>
-                <button onClick={() => setProofViewer(null)} className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors">&times;</button>
+                <button onClick={() => setProofViewer(null)} aria-label="Close proof image" className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors">&times;</button>
               </div>
               <div className="flex-1 flex items-center justify-center px-4 pb-10 overflow-hidden">
                 <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
@@ -2936,15 +2960,15 @@ export default function AppPage() {
                 </div>
                 <div className="bg-[var(--bg-elevated)] rounded-2xl p-4 mb-6 space-y-3 text-[13px] text-[var(--text-secondary)]">
                   <div className="flex gap-3">
-                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span className="text-[var(--green)] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>OopsSubs only looks for subscription receipts. We <strong className="text-[var(--text)]">cannot modify, delete, or send</strong> emails.</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span className="text-[var(--green)] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>Your email content is processed <strong className="text-[var(--text)]">locally in your browser</strong>. Nothing is uploaded to any server.</span>
                   </div>
                   <div className="flex gap-3">
-                    <span className="text-[var(--green)] flex-shrink-0">✓</span>
+                    <span className="text-[var(--green)] flex-shrink-0" aria-hidden="true">✓</span>
                     <span>You can revoke access anytime at <strong className="text-[var(--text)]">myaccount.google.com/permissions</strong>.</span>
                   </div>
                 </div>
