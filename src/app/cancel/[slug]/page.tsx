@@ -107,7 +107,7 @@ export default function CancelGuidePage({ params }: { params: { slug: string } }
 
       {/* FAQ */}
       <div className="card mb-4">
-        <h3 className="text-[15px] font-semibold mb-3">FAQ</h3>
+        <h2 className="text-[15px] font-semibold mb-3">FAQ</h2>
         <div className="space-y-3 text-[14px]">
           <div>
             <p className="font-medium text-[var(--text)]">Will I lose my data if I cancel?</p>

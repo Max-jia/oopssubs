@@ -45,6 +45,7 @@ export default function PricingPage() {
           </p>
           <p className="text-[14px] text-[var(--text-secondary)] mb-6">one-time payment</p>
 
+          <h2 className="sr-only">What's included</h2>
           <ul className="text-left space-y-3 mb-6 text-[15px]">
             {[
               "Unlimited subscription tracking",
@@ -77,6 +78,7 @@ export default function PricingPage() {
         </div>
 
         {/* Trust */}
+        <h2 className="sr-only">Why trust OopsSubs</h2>
         <div className="card text-center text-[13px] text-[var(--text-secondary)] space-y-2">
           <p className="flex items-center justify-center gap-1.5">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
