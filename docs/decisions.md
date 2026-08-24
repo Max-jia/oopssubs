@@ -45,3 +45,12 @@
 ## 2026-08-19（待辦紀錄）
 
 - **Cancel now 跳轉教學頁未生效(待修)**:urgent banner「Cancel now」在 App 內點擊後未跳轉到對應教學頁/列表。已排除 overlay 攔截(已修)、window.open(已改 location.href)、匹配邏輯(本地驗證 cancelSlugFor 正常)。v30 後用戶實測仍未跳轉——**待排查**(可能 App 內 location.href 導航被 Capacitor 攔截,或按鈕點擊未觸發)。測試環境 localhost 下 mouse 點擊可跳轉,但用戶實測不行——懷疑 Capacitor WebView 的導航處理差異。
+
+## 2026-08-24
+
+- **截圖證明評語文案分流**：審計發現語音版評語池(「The witness's voice is steady…」)套在截圖結果上，文字風格格格不入，且「聽不到服務名」會誤導用戶重錄語音。新增 IMAGE_PASS_LINES/IMAGE_FAIL_LINES 圖片版評語池，按證明類型分流。判斷邏輯未動。
+
+## 2026-08-25 設計審計修復 FINDING-007:隱私頁對比度
+- 隱私頁是唯一未用設計 token 的頁面(Tailwind 灰階 text-gray-900/600/400 配深色背景 #0A0A0C,對比 1.1:1/2.6:1,近乎不可見)
+- 決策:全部改為 token 系(text-[var(--text)] 標題、text-[var(--text-secondary)] 內文/連結),對比升至 17.9:1 / 7.2:1,過 WCAG AA
+- 依循「設計審計修復」批次,後續修復逐條追加
