@@ -1056,7 +1056,7 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
         <button
           onClick={handleAddToCalendar}
           disabled={calBusy}
-          className="text-[var(--text-tertiary)] hover:text-[var(--text)] transition-all duration-200 text-xs w-6 h-6 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center disabled:opacity-50"
+          className="text-[var(--text-tertiary)] hover:text-[var(--text)] transition-all duration-200 text-xs w-10 h-10 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center flex-shrink-0 disabled:opacity-50"
           title="Add to calendar"
         >
           {calBusy ? (
@@ -1915,7 +1915,7 @@ export default function AppPage() {
             >
               Cancel now
             </button>
-            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--text-tertiary)] hover:text-[var(--text)] text-lg">&times;</button>
+            <button onClick={() => setDismissedUrgent(p => [...p, s.id])} className="text-[var(--text-tertiary)] hover:text-[var(--text)] text-lg w-10 h-10 inline-flex items-center justify-center flex-shrink-0">&times;</button>
           </div>
         </motion.div>
       ))}
@@ -2205,7 +2205,7 @@ export default function AppPage() {
                     </p>
                     <button
                       onClick={() => { buzz(10); dismissTrialAlert(); }}
-                      className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-7 h-7 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center flex-shrink-0"
+                      className="text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-10 h-10 rounded-full hover:bg-[var(--amber-dim)] flex items-center justify-center flex-shrink-0"
                     >&times;</button>
                   </div>
                   <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-4">
@@ -2249,7 +2249,7 @@ export default function AppPage() {
                     </div>
                     <button
                       onClick={() => { setShowWeekly(false); localStorage.setItem("oopssubs_weekly_check", String(Date.now())); }}
-                      className="flex-shrink-0 text-[var(--text-secondary)] hover:text-[var(--text)] text-lg"
+                      className="flex-shrink-0 text-[var(--text-secondary)] hover:text-[var(--text)] text-lg w-10 h-10 inline-flex items-center justify-center"
                     >&times;</button>
                   </div>
                 </motion.div>
@@ -2351,7 +2351,7 @@ export default function AppPage() {
           {proof && (
             <div className="fixed inset-0 z-[60] bg-[var(--bg)] flex flex-col animate-fade-in">
               <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
-                <button onClick={closeProofFlow} className="text-[var(--text-secondary)] text-[26px] leading-none px-2 hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
+                <button onClick={closeProofFlow} className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors" disabled={proof.stage === "done"}>&times;</button>
                 <h2 className="text-[15px] font-semibold text-[var(--text)]">Cancel proof</h2>
                 <div className="w-9" />
               </div>
@@ -2727,7 +2727,7 @@ export default function AppPage() {
             >
               <div className="flex items-center justify-between px-6 pt-6 pb-3">
                 <p className="text-[14px] font-semibold text-[var(--bg)]">Proof — {proofViewer.name}</p>
-                <button onClick={() => setProofViewer(null)} className="text-[var(--text-secondary)] text-[26px] leading-none px-2 hover:text-[var(--text)] transition-colors">&times;</button>
+                <button onClick={() => setProofViewer(null)} className="text-[var(--text-secondary)] text-[26px] leading-none w-10 h-10 inline-flex items-center justify-center hover:text-[var(--text)] transition-colors">&times;</button>
               </div>
               <div className="flex-1 flex items-center justify-center px-4 pb-10 overflow-hidden">
                 <img src={proofViewer.dataUrl} alt={`Cancellation proof for ${proofViewer.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
