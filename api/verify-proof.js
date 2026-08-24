@@ -317,7 +317,17 @@ export default async function handler(req, res) {
     if (!verdictA || !verdictB) {
       return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
     }
-    const passed = verdictA.passed && verdictB.passed;
+    console.error("verify-proof verdicts:", JSON.stringify({ a: verdictA, b: verdictB }).slice(0, 400));
+    let passed = verdictA.passed && verdictB.passed;
+    // 審稿分歧:第三位獨立評審,多數決(單一審稿員偶發誤判不致誤殺)
+    if (verdictA.passed !== verdictB.passed) {
+      const verdictC = await callDashScope(promptUseB, 2, !!audioBase64);
+      if (!verdictC) {
+        return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
+      }
+      console.error("verify-proof verdictC:", JSON.stringify(verdictC).slice(0, 300));
+      passed = [verdictA, verdictB, verdictC].filter((v) => v.passed).length >= 2;
+    }
     const reason = passed
       ? pick(PASS_LINES)
       : pick(FAIL_LINES);
