@@ -101,6 +101,36 @@ export default async function handler(req, res) {
   ];
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+  // 名字是否出現在轉寫裡:程式判定(母音摺疊+編輯距離),不靠 AI 自由心證
+  // 例:dolinger ≈ duolingo ✓、googled ≈ google ✓;have ≠ hbo、pupil ≠ google ✗
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n; if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, i) => i);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      prev = cur;
+    }
+    return prev[n];
+  }
+  function nameMatches(transcript, name) {
+    const t = (transcript || "").toLowerCase();
+    const n = (name || "").toLowerCase();
+    if (!t || !n) return false;
+    if (t.includes(n)) return true;
+    const fold = (s) => s.replace(/[aeiou]/g, "0"); // 母音互換(accent)不計
+    const key = n.split(/\s+/).filter(Boolean).length > 1 ? n.split(/\s+/)[0] : n; // 多字名看首詞
+    if (key.length < 4) return t.split(/\W+/).includes(key);
+    return t.split(/\W+/).some((tw) =>
+      tw.length >= 4 &&
+      tw[0] === key[0] &&
+      (levenshtein(fold(tw), fold(key)) <= 2 || levenshtein(tw, key) <= 1)
+    );
+  }
+
   const audioPromptA =
     `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
     (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
@@ -286,23 +316,31 @@ export default async function handler(req, res) {
       } catch (e) {
         console.error("verify-proof qwen-asr error:", e.message);
         try {
-          transcript = await transcribeWithGemini(audioBase64, mimeType, name);
-        } catch (e2) {
-          console.error("verify-proof gemini-asr error:", e2.message);
+          transcript = await transcribeAudio(audioBase64);
+        } catch (e3) {
+          console.error("verify-proof NLS error:", e3.message);
           try {
-            transcript = await transcribeAudio(audioBase64);
-          } catch (e3) {
-            console.error("verify-proof NLS error:", e3.message);
+            transcript = await transcribeWithGemini(audioBase64, mimeType, name);
+          } catch (e2) {
+            console.error("verify-proof gemini-asr error:", e2.message);
             transcript = "";
           }
         }
       }
       if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
       // 用轉寫文本審核(替換提示詞的音頻描述為文本)
-      promptUseA = audioPromptA.replace(
-        "Listen to the audio and transcribe it.",
-        `The witness testified: "${transcript}"`
-      );
+      const nameOk = nameMatches(transcript, name);
+      promptUseA = audioPromptA
+        .replace(
+          "Listen to the audio and transcribe it.",
+          `The witness testified: "${transcript}"`
+        )
+        .replace(
+          'The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "googled one" ≈ "Google One"). The service reference (or an unmistakable close match) and a cancellation statement must both be present.',
+          nameOk
+            ? `Speech matching algorithmically verified the transcript contains the service name "${name}" — the service reference is CONFIRMED. A cancellation statement must also be present.`
+            : `Speech matching found NO service-name match in the transcript. FAIL unless the service reference to "${name}" is unmistakably present.`
+        );
       promptUseB = audioPromptB.replace(
         "Your ONLY job: is the cancellation statement credible?",
         `The witness testified: "${transcript}". Your ONLY job: is the cancellation statement credible?`
