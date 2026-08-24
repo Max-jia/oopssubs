@@ -2882,19 +2882,23 @@ export default function AppPage() {
                       <option value="quarterly">/qtr</option>
                     </select>
                   </div>
-                  <input className="input-apple" type="date" value={form.nextDate} onChange={(e) => setForm((f) => ({ ...f, nextDate: e.target.value }))} />
+                  <div>
+                    <label className="text-[12px] text-[var(--text-secondary)] mb-1 block">
+                      {form.isTrial ? "Trial ends on" : "Next billing date"}
+                    </label>
+                    <input
+                      className="input-apple"
+                      type="date"
+                      value={form.isTrial ? form.trialEnd : form.nextDate}
+                      onChange={(e) => setForm((f) => (f.isTrial ? { ...f, trialEnd: e.target.value } : { ...f, nextDate: e.target.value }))}
+                    />
+                  </div>
                   <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
                     <input type="checkbox" checked={form.isTrial} onChange={(e) => setForm((f) => ({ ...f, isTrial: e.target.checked }))} className="w-4 h-4 accent-[var(--amber)]" />
                     <span className="text-[14px] text-[var(--text)] font-medium">This is a free trial</span>
                   </label>
                   {form.isTrial && (
-                    <div className="space-y-3 pt-1">
-                      <div>
-                        <label className="text-[12px] text-[var(--text-secondary)] mb-1 block">Trial ends</label>
-                        <input className="input-apple" type="date" value={form.trialEnd} onChange={(e) => setForm((f) => ({ ...f, trialEnd: e.target.value }))} />
-                      </div>
-                      <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">Amount above is charged after the trial ends.</p>
-                    </div>
+                    <p className="text-[12px] text-[var(--text-tertiary)] leading-relaxed">Amount above is charged after the trial ends.</p>
                   )}
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setShowAdd(false)} className="btn-secondary flex-1">Cancel</button>
