@@ -172,7 +172,7 @@ export default async function handler(req, res) {
     const gkey = process.env.GEMINI_API_KEY;
     if (!gkey) throw new Error("gemini key missing");
     const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gkey,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" + gkey,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
