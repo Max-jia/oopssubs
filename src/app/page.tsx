@@ -88,7 +88,7 @@ export default function HomePage() {
           animate={{ y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
         >
-          <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-center">
+          <h1 className="font-display text-[30px] font-extrabold tracking-[-0.02em] text-[var(--text)] leading-[1.2] text-center">
             {taglineDone ? (
               <>
                 Some subscriptions are<br />

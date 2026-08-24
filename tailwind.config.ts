@@ -4,6 +4,9 @@ const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['Space Grotesk', 'Inter', 'sans-serif'],
+      },
       colors: {
         brand: {
           DEFAULT: '#FFB340',
