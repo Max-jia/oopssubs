@@ -167,6 +167,32 @@ export default async function handler(req, res) {
     return data.choices?.[0]?.message?.content || "";
   }
 
+  // Gemini 聽寫(百煉語音模型若失效,頂替轉寫)
+  async function transcribeWithGemini(audioB64, mime) {
+    const gkey = process.env.GEMINI_API_KEY;
+    if (!gkey) throw new Error("gemini key missing");
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gkey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts: [
+              { text: "Transcribe the audio verbatim. Output only the transcription." },
+              { inline_data: { mime_type: mime || "audio/wav", data: audioB64 } },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 300 },
+        }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error("gemini asr failed: " + (data?.error?.message || res.status));
+    return (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("") || "";
+  }
+
   async function transcribeAudio(audioB64) {
     const token = await createNlsToken();
     const appkey = process.env.ALIYUN_ISI_APPKEY;
@@ -243,10 +269,15 @@ export default async function handler(req, res) {
       } catch (e) {
         console.error("verify-proof qwen-asr error:", e.message);
         try {
-          transcript = await transcribeAudio(audioBase64);
+          transcript = await transcribeWithGemini(audioBase64, mimeType);
         } catch (e2) {
-          console.error("verify-proof NLS error:", e2.message);
-          transcript = "";
+          console.error("verify-proof gemini-asr error:", e2.message);
+          try {
+            transcript = await transcribeAudio(audioBase64);
+          } catch (e3) {
+            console.error("verify-proof NLS error:", e3.message);
+            transcript = "";
+          }
         }
       }
       if (!transcript) return res.json({ aiAvailable: true, passed: false, confidence: "low", reason: "The court heard nothing. Speak clearly and try again.", transcript: "" });
