@@ -237,6 +237,7 @@ export default async function handler(req, res) {
         messages: [{ role: "user", content }],
         max_tokens: 300,
         enable_thinking: false,
+        temperature: 0,
       }),
     });
     const data = await gemRes.json();
