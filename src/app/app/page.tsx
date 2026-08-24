@@ -655,8 +655,8 @@ const KNOWN_SERVICES: [RegExp, string, "monthly"|"yearly"][] = [
 ];
 
 
-// 已知發信網域 → 官方品牌名(掃描正規化共用:knownSenders + AI 後處理)
-const knownSenders: Record<string, string> = {
+// 已知發信網域 → 官方品牌名(掃描正規化共用:KNOWN_SENDERS + AI 後處理)
+const KNOWN_SENDERS: Record<string, string> = {
   'netflix': 'Netflix', 'spotify': 'Spotify', 'hulu': 'Hulu', 'disneyplus': 'Disney+',
   'youtube': 'YouTube Premium', 'amazon': 'Amazon', 'adobe': 'Adobe',
   'apple': 'Apple', 'linkedin': 'LinkedIn', 'microsoft': 'Microsoft',
@@ -679,11 +679,14 @@ const knownSenders: Record<string, string> = {
   'planetfitness': 'Planet Fitness', 'classpass': 'ClassPass',
   'myfitnesspal': 'MyFitnessPal', 'strava': 'Strava', 'fitbit': 'Fitbit',
   'audible': 'Audible', 'kindle': 'Kindle Unlimited',
+  'tinder': 'Tinder', 'bumble': 'Bumble', 'hinge': 'Hinge',
+  'doordash': 'DoorDash', 'ubereats': 'Uber', 'instacart': 'Instacart',
+  'peloton': 'Peloton', 'calm': 'Calm', 'headspace': 'Headspace',
 };
     // 品牌名正規化:AI/From header 常帶多餘後綴(DuolingoU、Netflix Inc),已知品牌一律換官方名
     const brandName = (raw: string): string | null => {
       const lower = raw.toLowerCase();
-      for (const [key, name] of Object.entries(knownSenders)) {
+      for (const [key, name] of Object.entries(KNOWN_SENDERS)) {
         if (key.length >= 3 && lower.includes(key)) return name;
       }
       for (const [pattern, name] of KNOWN_SERVICES) {
@@ -704,35 +707,8 @@ function matchSenderDomain(fromHeader: string): string | null {
     const slugKey = g.slug.replace(/-plus|-premium|-cc|-pass|-tv|-app|-online|-sub/g, '');
     if (domain.includes(slugKey) || slugKey.includes(domain)) return g.name;
   }
-  // Known sender domains
-  const knownSenders: Record<string, string> = {
-    'netflix': 'Netflix', 'spotify': 'Spotify', 'hulu': 'Hulu', 'disneyplus': 'Disney+',
-    'youtube': 'YouTube Premium', 'amazon': 'Amazon', 'adobe': 'Adobe',
-    'apple': 'Apple', 'linkedin': 'LinkedIn', 'microsoft': 'Microsoft',
-    'dropbox': 'Dropbox', 'notion': 'Notion', 'evernote': 'Evernote',
-    'nytimes': 'NYT', 'wsj': 'WSJ', 'washingtonpost': 'Washington Post',
-    'tinder': 'Tinder', 'bumble': 'Bumble', 'hinge': 'Hinge',
-    'doordash': 'DoorDash', 'ubereats': 'Uber', 'instacart': 'Instacart',
-    'peloton': 'Peloton', 'calm': 'Calm', 'headspace': 'Headspace',
-    'hellofresh': 'HelloFresh', 'blueapron': 'Blue Apron', 'chegg': 'Chegg',
-    'coursera': 'Coursera', 'skillshare': 'Skillshare', 'duolingo': 'Duolingo',
-    'discord': 'Discord', 'patreon': 'Patreon', 'substack': 'Substack',
-    'xbox': 'Xbox', 'playstation': 'PlayStation', 'nintendo': 'Nintendo',
-    'siriusxm': 'SiriusXM', 'pandora': 'Pandora', 'tidal': 'Tidal',
-    'norton': 'Norton', 'mcafee': 'McAfee', 'expressvpn': 'ExpressVPN',
-    'nordvpn': 'NordVPN', 'surfshark': 'Surfshark',
-    'canva': 'Canva', 'grammarly': 'Grammarly', 'lastpass': 'LastPass',
-    '1password': '1Password', 'walmart': 'Walmart+', 'barkbox': 'BarkBox',
-    'masterclass': 'MasterClass', 'babbel': 'Babbel',
-    'medium': 'Medium', 'reddit': 'Reddit', 'twitch': 'Twitch',
-    'ea.com': 'EA Play', 'fubo': 'FuboTV', 'sling': 'Sling TV',
-    'starz': 'Starz', 'crunchyroll': 'Crunchyroll', 'peacock': 'Peacock',
-    'paramount': 'Paramount+', 'max.com': 'Max', 'onlyfans': 'OnlyFans',
-    'planetfitness': 'Planet Fitness', 'classpass': 'ClassPass',
-    'myfitnesspal': 'MyFitnessPal', 'strava': 'Strava', 'fitbit': 'Fitbit',
-    'audible': 'Audible', 'kindle': 'Kindle Unlimited',
-  };
-  for (const [key, name] of Object.entries(knownSenders)) {
+  // Known sender domains(單一來源 KNOWN_SENDERS)
+  for (const [key, name] of Object.entries(KNOWN_SENDERS)) {
     if (domain.includes(key) || key.includes(domain)) return name;
   }
   return null;

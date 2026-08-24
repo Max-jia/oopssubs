@@ -23,6 +23,7 @@ const iconPaths = {
 
 const CANCELLED_KEY = "oopssubs_cancelled";
 const DETECTIVE_KEY = "oopssubs_detective";
+const INTRO_KEY = "oopssubs_intro_played";
 function getClosedCases(): { name: string; amount: number; cycle: string; date: string }[] {
   if (typeof window === "undefined") return [];
   try { return JSON.parse(localStorage.getItem(CANCELLED_KEY) || "[]"); }
@@ -45,6 +46,15 @@ export default function HomePage() {
     setIsNative(isNativeApp());
     setClosedCases(getClosedCases().slice(-5).reverse());
     setDetectiveCases(getDetectiveCases());
+    // 本 session 已播過 intro(打字機 + CONFIDENTIAL 章)就不重播,直接顯示最終畫面
+    try {
+      if (sessionStorage.getItem(INTRO_KEY) === "1") {
+        setTaglineDone(true);
+        setSubtitleDone(true);
+      } else {
+        sessionStorage.setItem(INTRO_KEY, "1");
+      }
+    } catch { /* noop */ }
   }, []);
 
   return (

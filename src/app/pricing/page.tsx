@@ -35,7 +35,7 @@ export default function PricingPage() {
         transition={{ delay: 0.1 }}
       >
         <h1 className="text-[28px] font-extrabold tracking-[-0.02em] mb-2">OopsSubs Pro</h1>
-        <p className="text-[15px] text-[var(--text-secondary)] mb-8">One payment. Unlimited subscriptions. Forever.</p>
+        <p className="text-[15px] text-[var(--text-secondary)] mb-8">Pay once. Then stop paying for subscriptions you forgot.</p>
 
         {/* Price card */}
         <div className="card-elevated text-center mb-6">
