@@ -193,9 +193,12 @@ export default async function handler(req, res) {
     return (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("") || "";
   }
 
-  // 跑兩次取最接近服務名的一份(單次偶發幻聽,如 Google One → pupil 1,雙重保險)
+  // 轉寫:含服務名首詞即信任(單次調用,省 Gemini 配額);否則再跑一次防幻聽,取最接近的一份
   async function transcribeWithGemini(audioB64, mime, name) {
-    const attempts = (await Promise.all([geminiTranscribeOnce(audioB64, mime), geminiTranscribeOnce(audioB64, mime)])).filter(Boolean);
+    const firstToken = (name || "").toLowerCase().split(/\s+/)[0] || "";
+    const first = await geminiTranscribeOnce(audioB64, mime);
+    if (first && first.toLowerCase().includes(firstToken)) return first;
+    const attempts = [first, await geminiTranscribeOnce(audioB64, mime)].filter(Boolean);
     if (attempts.length === 0) throw new Error("gemini asr failed");
     const score = (s) => {
       const lower = s.toLowerCase();
