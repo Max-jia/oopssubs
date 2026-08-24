@@ -324,7 +324,8 @@ export default async function handler(req, res) {
     let passed = verdictA.passed && verdictB.passed;
     // 審稿分歧:第三位獨立評審,多數決(單一審稿員偶發誤判不致誤殺)
     if (verdictA.passed !== verdictB.passed) {
-      const verdictC = await callDashScope(promptUseB, 2, !!audioBase64);
+      // C 用完整模板(A 式):B 式預設信任 A 的名字檢查,平手時不能拿 B 當裁判
+      const verdictC = await callDashScope(promptUseA, 2, !!audioBase64);
       if (!verdictC) {
         return res.status(502).json({ aiAvailable: false, error: "ai upstream error" });
       }
