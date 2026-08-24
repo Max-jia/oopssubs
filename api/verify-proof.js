@@ -168,7 +168,7 @@ export default async function handler(req, res) {
   }
 
   // Gemini 聽寫(百煉語音模型若失效,頂替轉寫)
-  async function transcribeWithGemini(audioB64, mime) {
+  async function geminiTranscribeOnce(audioB64, mime) {
     const gkey = process.env.GEMINI_API_KEY;
     if (!gkey) throw new Error("gemini key missing");
     const res = await fetch(
@@ -191,6 +191,19 @@ export default async function handler(req, res) {
     const data = await res.json();
     if (!res.ok) throw new Error("gemini asr failed: " + (data?.error?.message || res.status));
     return (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("") || "";
+  }
+
+  // 跑兩次取最接近服務名的一份(單次偶發幻聽,如 Google One → pupil 1,雙重保險)
+  async function transcribeWithGemini(audioB64, mime, name) {
+    const attempts = (await Promise.all([geminiTranscribeOnce(audioB64, mime), geminiTranscribeOnce(audioB64, mime)])).filter(Boolean);
+    if (attempts.length === 0) throw new Error("gemini asr failed");
+    const score = (s) => {
+      const lower = s.toLowerCase();
+      let sc = lower.includes(name.toLowerCase()) ? 100 : 0;
+      for (const token of name.toLowerCase().split(/\s+/)) if (lower.includes(token)) sc += 30;
+      return sc + Math.min(s.length, 200);
+    };
+    return attempts.sort((a, b) => score(b) - score(a))[0];
   }
 
   async function transcribeAudio(audioB64) {
@@ -270,7 +283,7 @@ export default async function handler(req, res) {
       } catch (e) {
         console.error("verify-proof qwen-asr error:", e.message);
         try {
-          transcript = await transcribeWithGemini(audioBase64, mimeType);
+          transcript = await transcribeWithGemini(audioBase64, mimeType, name);
         } catch (e2) {
           console.error("verify-proof gemini-asr error:", e2.message);
           try {
