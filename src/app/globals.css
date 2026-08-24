@@ -30,6 +30,7 @@
   --skeleton-lo: #1C1C1F;
   --text-on-card: rgba(10, 10, 12, 0.45);
   --text-on-card-strong: rgba(10, 10, 12, 0.6);
+  --scrim: rgba(28, 28, 31, 0.35);
 }
 
 @layer base {

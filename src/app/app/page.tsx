@@ -2177,7 +2177,7 @@ export default function AppPage() {
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <button onClick={() => dismissScanned(i)} className="bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] active:scale-95 transition-all duration-150 text-[14px] font-medium px-4 py-2 rounded-full">Skip</button>
-                    <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-[var(--bg)] text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[var(--amber)] hover:bg-[#e68f00]' : 'bg-[var(--text)] hover:bg-[var(--bg-hover)]'}`}>Add</button>
+                    <button onClick={() => confirmScanned(item, i)} className={`active:scale-95 transition-all duration-150 text-[var(--bg)] text-[14px] font-medium px-4 py-2 rounded-full ${item.isTrial ? 'bg-[var(--amber)] hover:bg-[var(--brand-strong)]' : 'bg-[var(--text)] hover:bg-[var(--bg-hover)]'}`}>Add</button>
                   </div>
                 </motion.div>
               ))}
@@ -2222,7 +2222,7 @@ export default function AppPage() {
                     </button>
                     <Link
                       href={isNativeApp() ? (trialAlert.slug ? `/cancel/${trialAlert.slug}/index.html` : "/cancel/index.html") : (trialAlert.slug ? `/cancel/${trialAlert.slug}` : "/cancel")}
-                      className="flex-1 bg-[var(--amber)] hover:bg-[#e68f00] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium py-2.5 rounded-full text-center"
+                      className="flex-1 bg-[var(--amber)] hover:bg-[var(--brand-strong)] active:scale-95 transition-all duration-150 text-[var(--bg)] text-[13px] font-medium py-2.5 rounded-full text-center"
                     >
                       Cancel it
                     </Link>
@@ -2503,7 +2503,7 @@ export default function AppPage() {
                         {/* 鏡片：外圈陰影把畫面其他部分變暗，像真拿放大鏡在照 */}
                         <div
                           className="w-16 h-16 rounded-full border-[5px] border-[var(--text)] bg-white/10"
-                          style={{ boxShadow: "0 0 0 9999px rgba(29,29,31,0.35)", marginLeft: -32, marginTop: -32 }}
+                          style={{ boxShadow: "0 0 0 9999px var(--scrim)", marginLeft: -32, marginTop: -32 }}
                         />
                         {/* 鏡柄 */}
                         <div className="w-1.5 h-10 bg-[var(--text)] rounded-full" style={{ transform: "rotate(45deg)", transformOrigin: "top left" }} />
@@ -3009,7 +3009,7 @@ export default function AppPage() {
                 <button onClick={handleBuyPro} disabled={buying} className="btn-primary w-full mb-3 disabled:opacity-50">
                   {buying ? "Processing…" : "Get OopsSubs Pro — $9.99"}
                 </button>
-                {buyError && <p className="text-[13px] text-red-600 mb-3 text-center">{buyError}</p>}
+                {buyError && <p className="text-[13px] text-[var(--red)] mb-3 text-center">{buyError}</p>}
                 <button
                   onClick={handleRestore}
                   disabled={restoring}

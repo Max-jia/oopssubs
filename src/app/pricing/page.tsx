@@ -73,7 +73,7 @@ export default function PricingPage() {
           </button>
           <p className="text-[12px] text-[var(--text-tertiary)] mt-3">Pay once. No subscription. No recurring fees.</p>
           {purchased && <p className="text-[13px] text-[var(--green)] mt-2">✓ Pro unlocked — enjoy unlimited subscriptions!</p>}
-          {buyError && <p className="text-[13px] text-red-600 mt-2">{buyError}</p>}
+          {buyError && <p className="text-[13px] text-[var(--red)] mt-2">{buyError}</p>}
         </div>
 
         {/* Trust */}

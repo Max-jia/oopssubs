@@ -99,6 +99,31 @@ export default async function handler(req, res) {
     "The detective frowns. Not good enough.",
     "Evidence doesn't match the claim. Rejected.",
   ];
+  // 圖片版評語池(截圖沒有聲音,風格對應「看」)
+  const IMAGE_PASS_LINES = [
+    "The screenshot speaks clearly. Case closed.",
+    "Crystal clear screenshot. Evidence recorded.",
+    "The pixels don't lie. Accepted.",
+    "Clear image, clear proof. Case closed.",
+    "The screenshot tells the truth. Accepted.",
+    "Sharp and unambiguous. The court is satisfied.",
+    "Evidence in plain sight. Case closed.",
+    "The detective examines the screenshot. Approved.",
+    "Nothing to hide here. Proof accepted.",
+    "The image confirms it. Case closed.",
+  ];
+  const IMAGE_FAIL_LINES = [
+    "The screenshot doesn't prove cancellation. Try again.",
+    "Too blurry or unrelated. Upload a clearer screenshot.",
+    "The image doesn't show a cancelled state. Rejected.",
+    "Service name not visible in the screenshot. Try again.",
+    "This looks like an active subscription. Rejected.",
+    "Not enough evidence in the image. Try again.",
+    "The screenshot shows no cancellation. Rejected.",
+    "Unclear or irrelevant screenshot. The court is not convinced.",
+    "The image doesn't match the claim. Rejected.",
+    "Screenshot doesn't hold up. Try again.",
+  ];
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
   // 名字是否出現在轉寫裡:程式判定(母音摺疊+編輯距離),不靠 AI 自由心證
@@ -376,8 +401,8 @@ export default async function handler(req, res) {
       passed = [verdictA, verdictB, verdictC].filter((v) => v.passed).length >= 2;
     }
     const reason = passed
-      ? pick(PASS_LINES)
-      : pick(FAIL_LINES);
+      ? pick(audioBase64 ? PASS_LINES : IMAGE_PASS_LINES)
+      : pick(audioBase64 ? FAIL_LINES : IMAGE_FAIL_LINES);
     return res.json({
       aiAvailable: true,
       passed,
