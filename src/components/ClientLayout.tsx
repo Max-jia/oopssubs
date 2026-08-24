@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { MotionConfig } from "framer-motion";
 import InstallPrompt from "./InstallPrompt";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -16,9 +17,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, []);
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       {children}
       <InstallPrompt />
-    </>
+    </MotionConfig>
   );
 }

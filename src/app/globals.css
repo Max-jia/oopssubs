@@ -39,6 +39,14 @@
     outline-offset: 2px;
   }
   html { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
   body {
     @apply bg-[var(--bg)] text-[var(--text)] antialiased selection:bg-[var(--text)] selection:text-[var(--bg)] overflow-x-hidden;
     -webkit-font-smoothing: antialiased;
