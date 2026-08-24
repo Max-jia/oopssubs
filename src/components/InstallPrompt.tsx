@@ -39,7 +39,7 @@ export default function InstallPrompt() {
           className="fixed bottom-4 left-4 right-4 z-50"
         >
           <div className="bg-[var(--text)] text-white rounded-3xl px-5 py-4 shadow-2xl flex items-center gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center">
+            <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
               <img src="/icon-192.png" alt="" className="w-7 h-7 rounded-lg" />
             </div>
             <div className="flex-1 min-w-0">

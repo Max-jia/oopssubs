@@ -1033,7 +1033,7 @@ function SubscriptionRow({ sub, onDelete, onCalError }: { sub: Subscription; onD
   return (
     <div className="flex items-center justify-between py-3.5 px-5 hover:bg-[var(--bg-elevated)]/50 transition-colors duration-150 group -mx-5 rounded-2xl">
       <div className="flex items-center gap-3.5 min-w-0">
-        <div className="w-11 h-11 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center text-[15px] font-semibold text-[var(--text)] flex-shrink-0 shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-[var(--bg-elevated)] flex items-center justify-center text-[15px] font-semibold text-[var(--text)] flex-shrink-0 shadow-sm">
           {sub.name[0].toUpperCase()}
         </div>
         <div className="min-w-0">
@@ -2117,8 +2117,8 @@ export default function AppPage() {
               <div className="absolute inset-0 rounded-full border-2 border-[var(--divider)] animate-pulse" />
               {/* Envelope */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 text-[var(--text)] envelope-float" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+                <div className="relative w-12 h-12">
+                  <svg className="w-12 h-12 text-[var(--text)] envelope-float" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                   </svg>
                   {/* Scanning line */}
@@ -2383,7 +2383,7 @@ export default function AppPage() {
               <div className="flex-1 overflow-y-auto px-6 pb-10">
                 {proof.stage === "select" && (
                   <div className="text-center pt-6">
-                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                    <div className="w-12 h-12 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
                       <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316zM16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
                       </svg>
@@ -2428,7 +2428,7 @@ export default function AppPage() {
 
                 {proof.stage === "audio" && (
                   <div className="text-center pt-6">
-                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                    <div className="w-12 h-12 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
                       <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                       </svg>
@@ -2526,7 +2526,7 @@ export default function AppPage() {
                       >
                         {/* 鏡片：外圈陰影把畫面其他部分變暗，像真拿放大鏡在照 */}
                         <div
-                          className="w-16 h-16 rounded-full border-[5px] border-[var(--text)] bg-white/10"
+                          className="w-12 h-12 rounded-full border-[5px] border-[var(--text)] bg-white/10"
                           style={{ boxShadow: "0 0 0 9999px var(--scrim)", marginLeft: -32, marginTop: -32 }}
                         />
                         {/* 鏡柄 */}
@@ -2544,7 +2544,7 @@ export default function AppPage() {
 
                 {proof.stage === "teased" && (
                   <div className="text-center pt-6">
-                    <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
+                    <div className="w-12 h-12 mx-auto mb-5 rounded-2xl bg-[var(--amber-dim)] flex items-center justify-center">
                       <svg className="w-8 h-8 text-[var(--amber)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
                       </svg>

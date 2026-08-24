@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 /* ── Dark-first design tokens ── */
 :root {
@@ -14,7 +14,7 @@
   --border-soft: rgba(255, 255, 255, 0.08);
   --text: #F5F5F7;
   --text-secondary: #98989F;
-  --text-tertiary: #6E6E76;
+  --text-tertiary: #808089;
   --green: #30D158;
   --green-dim: rgba(48, 209, 88, 0.12);
   --red: #FF453A;
@@ -28,7 +28,7 @@
   --divider: #2C2C30;
   --skeleton-hi: #26262A;
   --skeleton-lo: #1C1C1F;
-  --text-on-card: rgba(10, 10, 12, 0.45);
+  --text-on-card: rgba(10, 10, 12, 0.68);
   --text-on-card-strong: rgba(10, 10, 12, 0.6);
   --scrim: rgba(28, 28, 31, 0.35);
 }
