@@ -169,7 +169,7 @@
   .badge-hard { @apply inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--red-dim)] text-[var(--red)]; }
 
   .divider { @apply h-px bg-[var(--divider)] my-4; }
-  .nav-link { @apply inline-flex items-center min-h-[44px] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors duration-200; }
+  .nav-link { @apply inline-flex items-center min-h-[44px] px-3 text-[13px] text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors duration-200; }
 
   /* ── 點擊漣漪(主/次按鈕) ── */
 }
