@@ -104,14 +104,14 @@ export default async function handler(req, res) {
   const audioPromptA =
     `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
     (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
-    `. Listen to the audio and transcribe it.\n` +
-    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo"). The service reference (or an unmistakable close match) and a cancellation statement must both be present.\n` +
+    `. Listen to the audio and transcribe it. The transcript you receive is a reliable machine transcription of the recording.\n` +
+    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "googled one" ≈ "Google One"). The service reference (or an unmistakable close match) and a cancellation statement must both be present. Do not invent doubts about a clear statement: a direct "I have cancelled X" statement must be accepted.\n` +
     `FAIL if: the service name is missing or unclear; there is no clear cancellation statement; the speech is too unclear/too short to understand; or the person seems to be reading something unrelated.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
 
   const audioPromptB =
     `You are an adversarial second reviewer. The first reviewer already confirmed the service name "${name}" matches the testimony. Your ONLY job: is the cancellation statement credible? Be skeptical but fair.\n` +
-    `FAIL only if there is genuinely no cancellation statement at all. Do NOT fail for briefness, casual spoken grammar, transcription imperfections, or service-name phrasing — "i have canceled", "i cancel", "i canceled", "i ended", "i stopped" are all valid. If unsure, FAIL.\n` +
+    `FAIL only if there is genuinely no cancellation statement at all. Do NOT fail for briefness, casual spoken grammar, transcription imperfections, or service-name phrasing — "i have canceled", "i cancel", "i canceled", "i ended", "i stopped" are all valid. A clear statement like "I have cancelled X" must PASS — only invent doubts when the statement is genuinely missing.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence"}`;
 
   // ── 阿里雲 NLS 一句話識別(極速版):同步轉寫語音 ──
@@ -180,11 +180,11 @@ export default async function handler(req, res) {
           contents: [{
             role: "user",
             parts: [
-              { text: "Transcribe the audio verbatim. Output only the transcription." },
+              { text: "This is a speech-recognition task. Transcribe the audio EXACTLY as spoken — do not guess, correct, or rephrase words. Output only the transcription." },
               { inline_data: { mime_type: mime || "audio/wav", data: audioB64 } },
             ],
           }],
-          generationConfig: { maxOutputTokens: 300 },
+          generationConfig: { maxOutputTokens: 300, temperature: 0 },
         }),
       }
     );
