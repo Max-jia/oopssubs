@@ -2870,11 +2870,11 @@ export default function AppPage() {
                 <h3 className="text-[20px] font-extrabold tracking-[-0.02em] mb-1">File a report</h3>
                 <p className="text-[13px] text-[var(--text-secondary)] mb-5">Report a service that's charging you</p>
                 <div className="space-y-3">
-                  <input className="input-apple" placeholder="Name of the suspect" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus />
+                  <input className="input-apple" placeholder="Name of the suspect" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} autoFocus required />
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <span className="absolute left-4 top-[14px] text-[15px] text-[var(--text-tertiary)] font-medium">$</span>
-                      <input className="input-apple pl-8" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+                      <input className="input-apple pl-8" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} required />
                     </div>
                     <select className="select-apple w-auto" value={form.cycle} onChange={(e) => setForm((f) => ({ ...f, cycle: e.target.value as any }))}>
                       <option value="monthly">/mo</option>
@@ -2891,6 +2891,7 @@ export default function AppPage() {
                       type="date"
                       value={form.isTrial ? form.trialEnd : form.nextDate}
                       onChange={(e) => setForm((f) => (f.isTrial ? { ...f, trialEnd: e.target.value } : { ...f, nextDate: e.target.value }))}
+                      required={!form.isTrial}
                     />
                   </div>
                   <label className="flex items-center gap-2.5 py-1 cursor-pointer select-none">
