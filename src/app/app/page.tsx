@@ -71,6 +71,11 @@ function addCancelled(sub: Subscription, proof?: ProofRecord) {
   localStorage.setItem(CANCELLED_KEY, JSON.stringify(all));
 }
 
+/* 免費額度 = 活躍 + 已取消（破案也算佔額度，防止「追蹤→取消→再追蹤」繞過付費牆） */
+function usedSlots(subs: Subscription[]): number {
+  return subs.length + getCancelled().length;
+}
+
 /* 截圖存 IndexedDB（容量大、不會被清掉） */
 const PROOF_DB = "oopssubs_db";
 const PROOF_STORE = "proof_images";
@@ -1352,7 +1357,7 @@ export default function AppPage() {
       }
     } else if (action === 'manual') {
       // Free limit reached → paywall straight away, no empty form filling
-      if (!pro && subs.length >= FREE_LIMIT) openPaywallIfNeeded();
+      if (!pro && usedSlots(subs) >= FREE_LIMIT) openPaywallIfNeeded();
       else setShowAdd(true);
     }
   }, [mounted]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1517,7 +1522,7 @@ export default function AppPage() {
 
   // 付費牆前重查購買狀態:已買過就解鎖不彈窗(防止 pro 狀態過期誤彈)
   const openPaywallIfNeeded = useCallback(async (): Promise<boolean> => {
-    if (subs.length < FREE_LIMIT) return false;
+    if (usedSlots(subs) < FREE_LIMIT) return false;
     if (pro) return false;
     const isPro = await checkPro();
     if (isPro) { setPro(true); return false; }
@@ -2047,7 +2052,7 @@ export default function AppPage() {
           </Link>
           <div className="flex items-center gap-2">
             {!pro && (
-              <span className="text-[12px] text-[var(--text-secondary)]">{subs.length}/{FREE_LIMIT} free</span>
+              <span className="text-[12px] text-[var(--text-secondary)]">{usedSlots(subs)}/{FREE_LIMIT} free</span>
             )}
             {!pro && <Link href="/pricing" className="inline-flex items-center min-h-[44px] text-[12px] font-semibold text-[var(--bg)] bg-[var(--brand)] hover:bg-[var(--brand-strong)] px-3 py-1.5 rounded-full transition-colors">Get Pro</Link>}
             {pro && <span className="text-[12px] font-semibold text-[var(--green)]">PRO</span>}
