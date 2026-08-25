@@ -1593,6 +1593,7 @@ export default function AppPage() {
 
   /* ── 取消證據流程 ── */
   const openProofFlow = useCallback((sub: Subscription) => {
+    setAudioUrl(null); // 清掉舊錄音顯示：否則重進流程會看到上一段證詞
     setProof({ sub, stage: "select", image: null, audio: null, isAudio: false, verdict: null, aiError: false, line: "", verified: null, checks: [false, false, false], hold: 0, teaseCount: 0, teaseLine: "" });
   }, []);
 
@@ -2418,6 +2419,7 @@ export default function AppPage() {
                     <h3 className="text-[22px] font-bold tracking-[-0.02em] text-[var(--text)] mb-2">Give your testimony</h3>
                     <p className="text-[14px] text-[var(--text-secondary)] leading-relaxed mb-6 max-w-[300px] mx-auto">
                       Tell the court, in your own words, that you have cancelled <strong className="text-[var(--text)]">{proof.sub.name}</strong>. Speak clearly. The AI will judge your words.
+                      <span className="block mt-2 text-[13px] text-[var(--text-tertiary)]">Say: “I have cancelled {proof.sub.name}.”</span>
                     </p>
                     {audioUrl ? (
                       <div className="card p-4 mb-6">

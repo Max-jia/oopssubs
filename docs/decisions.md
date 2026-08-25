@@ -64,3 +64,10 @@
 - 問題：網站版按「Get Pro」→ buyPro 跳轉 Stripe 前回傳 ok → 按鈕立即 setPro(true) → 用戶按瀏覽器返回，bfcache 還原頁面記憶體狀態 → 未付款但 Pro 顯示已解鎖
 - 決策：buyPro 跳轉路徑改回傳 { ok:false, redirecting:true }，解鎖只發生在 handleStripeReturn 伺服器驗證 payment_status=paid 之後；兩處按鈕（app 付費牆、pricing 頁）處理 redirecting 分支
 - 影響：src/lib/purchases.ts、src/app/app/page.tsx、src/app/pricing/page.tsx
+
+## 2026-08-26 語音證詞 3 連拒 + 舊錄音殘留 修復
+- 問題 1：錄「I have cancelled Gemini」3 次全拒 — 線上日誌實錘主要 ASR（百煉 qwen-audio）每次 400 白請求；備援 NLS 把「Gemini」聽成「Germany」/「jimmy」；審核員 A 嚴格比對服務名 → 拒
+- 決策：① PRONUNCIATION_ALIASES 音近容錯表（gemini→germany/jimmy/gemeni），nameMatches 與語音審核 prompt 共用；② qwen 錯誤日誌加詳細 body（找出 400 真因）；③ 錄音頁加示範台詞「Say: I have cancelled X」
+- 問題 2：重進取消流程顯示上一段舊錄音 — audioUrl 播放器狀態沒在 openProofFlow 清空；提交用另一份狀態（proof.audio），純顯示 bug
+- 決策：openProofFlow 加 setAudioUrl(null)
+- 影響：api/verify-proof.js、src/app/app/page.tsx

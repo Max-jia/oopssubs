@@ -8,6 +8,12 @@ const DASHSCOPE_URL = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatibl
 const DASHSCOPE_PUBLIC_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // base64 上限約 12MB（Gemini inline 上限 20MB）
 
+// 語音識別常見誤聽：實際說的服務名 → ASR 常聽成的字（審核時視為同一服務）
+// 例：用戶說 "I have cancelled Gemini"，ASR 可能聽成 "Germany"、"jimmy"
+const PRONUNCIATION_ALIASES = {
+  gemini: ["germany", "jimmy", "gemeni"],
+};
+
 // 允許的來源：網站 + App WebView（capacitor://localhost）+ 本機開發
 const ALLOWED_ORIGINS = ["https://oopssubs.com", "http://localhost", "https://localhost", "capacitor://localhost", "capacitor://localhost:3000"];
 
@@ -147,6 +153,9 @@ export default async function handler(req, res) {
     if (!t || !n) return false;
     if (t.includes(n)) return true;
     if (t.replace(/\s+/g, "").includes(n.replace(/\s+/g, ""))) return true; // "only fans" ≈ "onlyfans"
+    // 語音識別音近誤聽容錯：整詞命中即視為同一服務（如 "germany" ≈ "gemini"）
+    const aliasMap = PRONUNCIATION_ALIASES[n];
+    if (aliasMap && aliasMap.some((a) => t.split(/\W+/).includes(a))) return true;
     const fold = (s) => s.replace(/[aeiou]/g, "0"); // 母音互換(accent)不計
     const key = n.split(/\s+/).filter(Boolean).length > 1 ? n.split(/\s+/)[0] : n; // 多字名看首詞
     if (key.length < 4) return t.split(/\W+/).includes(key);
@@ -157,11 +166,16 @@ export default async function handler(req, res) {
     );
   }
 
+  const nameKey = (name || "").toLowerCase();
+  const aliasList = PRONUNCIATION_ALIASES[nameKey];
+  const aliasNote = aliasList
+    ? ` Known speech-recognition mishearings of "${name}" (the witness may have said "${name}" but the machine heard it as e.g. ${aliasList.map((a) => `"${a}"`).join(" or ")}). If the testimony says one of these forms with a clear cancellation statement, treat the service reference as satisfied.`
+    : "";
   const audioPromptA =
     `You are a court-appointed truth reviewer for a subscription cancellation claim. The user recorded a spoken testimony claiming they cancelled "${name}"` +
     (amount ? ` (${amount}${cycle ? " per " + cycle : ""})` : "") +
     `. Listen to the audio and transcribe it. The transcript you receive is a reliable machine transcription of the recording.\n` +
-    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "googled one" ≈ "Google One"). The service reference (or an unmistakable close match) and a cancellation statement must both be present. Do not invent doubts about a clear statement: a direct "I have cancelled X" statement must be accepted.\n` +
+    `PASS if the testimony clearly states that "${name}" was cancelled or is no longer subscribed — accept any form: "I cancelled/cancel/canceled ${name}", "I ended my ${name} subscription", "${name} is cancelled", "I stopped ${name}", "no more ${name}". The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "googled one" ≈ "Google One"). The service reference (or an unmistakable close match) and a cancellation statement must both be present. Do not invent doubts about a clear statement: a direct "I have cancelled X" statement must be accepted.${aliasNote}\n` +
     `FAIL if: the service name is missing or unclear; there is no clear cancellation statement; the speech is too unclear/too short to understand; or the person seems to be reading something unrelated.\n` +
     `Reply with JSON only: {"passed": true|false, "confidence": "high"|"medium"|"low", "reason": "one short sentence", "transcript": "verbatim transcription of what was said"}`;
 
@@ -218,8 +232,9 @@ export default async function handler(req, res) {
         max_tokens: 300,
       }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error("qwen asr failed: " + (data?.message || res.status));
+    let data;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok) throw new Error("qwen asr failed: " + (data?.message || (data && JSON.stringify(data).slice(0, 300)) || res.status));
     return data.choices?.[0]?.message?.content || "";
   }
 
@@ -369,7 +384,7 @@ export default async function handler(req, res) {
           'The service name may have transcription pronunciation errors — accept close matches (e.g. "doolinga" ≈ "Duolingo", "googled one" ≈ "Google One"). The service reference (or an unmistakable close match) and a cancellation statement must both be present.',
           nameOk
             ? `Speech matching algorithmically verified the transcript contains the service name "${name}" — the service reference is CONFIRMED. A cancellation statement must also be present.`
-            : `Speech matching found NO service-name match in the transcript. FAIL unless the service reference to "${name}" is unmistakably present.`
+            : `Speech matching found NO exact service-name match in the transcript.${aliasNote} FAIL unless a clear cancellation statement is present AND the service reference to "${name}" is unmistakable or one of the known mishearings above.`
         );
       promptUseB = audioPromptB.replace(
         "Your ONLY job: is the cancellation statement credible?",
