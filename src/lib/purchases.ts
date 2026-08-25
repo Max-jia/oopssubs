@@ -65,7 +65,8 @@ export async function buyPro(): Promise<{ ok: boolean; cancelled?: boolean; erro
       const data = await res.json();
       if (data?.url) {
         window.location.href = data.url;
-        return { ok: true, redirecting: true };
+        // 跳轉後由伺服器驗證付款才解鎖 — 不能在此回 ok，否則按鈕會先假解鎖（按返回後 Pro 假性解鎖）
+        return { ok: false, redirecting: true };
       }
       return { ok: false, error: "checkout-failed" };
     } catch {

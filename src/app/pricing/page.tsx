@@ -17,6 +17,7 @@ export default function PricingPage() {
     const res = await buyPro();
     setBuying(false);
     if (res.ok) setPurchased(true);
+    else if (res.redirecting) { /* 已跳轉 Stripe，等伺服器驗證回傳才顯示成功 */ }
     else if (!res.cancelled) setBuyError("Purchase failed. Please try again.");
   };
 

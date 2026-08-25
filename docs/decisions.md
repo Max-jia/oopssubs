@@ -59,3 +59,8 @@
 - 問題：免費用戶 3 個額度只算「活躍中」訂閱，已取消的不佔額度 → 用戶可「追蹤 3 個 → 取消 → 再追蹤 3 個」無限繞過付費牆
 - 決策：額度 = 活躍訂閱 + 已取消訂閱（usedSlots helper，4 處 FREE_LIMIT 檢查全部改用），防止繞過
 - 影響：src/app/app/page.tsx（手動新增檢查、付費牆觸發檢查、右上角額度顯示、paywall 文案不變）
+
+## 2026-08-25 付費牆假解鎖 Bug 修復：跳轉 Stripe 前不再提前解鎖
+- 問題：網站版按「Get Pro」→ buyPro 跳轉 Stripe 前回傳 ok → 按鈕立即 setPro(true) → 用戶按瀏覽器返回，bfcache 還原頁面記憶體狀態 → 未付款但 Pro 顯示已解鎖
+- 決策：buyPro 跳轉路徑改回傳 { ok:false, redirecting:true }，解鎖只發生在 handleStripeReturn 伺服器驗證 payment_status=paid 之後；兩處按鈕（app 付費牆、pricing 頁）處理 redirecting 分支
+- 影響：src/lib/purchases.ts、src/app/app/page.tsx、src/app/pricing/page.tsx

@@ -1563,6 +1563,7 @@ export default function AppPage() {
     const res = await buyPro();
     setBuying(false);
     if (res.ok) { setPro(true); setShowPaywall(false); }
+    else if (res.redirecting) { /* 已跳轉 Stripe，等伺服器驗證回傳才解鎖 */ }
     else if (!res.cancelled) { setBuyError("Purchase failed. Please try again."); }
   }, []);
 
